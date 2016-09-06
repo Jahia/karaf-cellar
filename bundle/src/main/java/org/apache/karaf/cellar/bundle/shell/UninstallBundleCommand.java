@@ -78,9 +78,7 @@ public class UninstallBundleCommand extends BundleCommandSupport {
                     return null;
                 }
 
-                // update the cluster state
-                state.setStatus(Bundle.UNINSTALLED);
-                clusterBundles.put(bundle, state);
+                clusterBundles.remove(bundle);
 
                 // broadcast the cluster event
                 String[] split = bundle.split("/");
