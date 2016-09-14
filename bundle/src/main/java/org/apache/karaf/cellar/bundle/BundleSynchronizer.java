@@ -183,7 +183,13 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
                                         }
                                     }
                                 } catch (BundleException e) {
-                                    LOGGER.error("CELLAR BUNDLE: failed to pull bundle {}", id, e);
+                                    if (BundleException.RESOLVE_ERROR == e.getType()) {
+                                        // we log unresolved dependencies in DEBUG
+                                        LOGGER.warn("CELLAR BUNDLE: Bundle {} has unresolved dependencies and won't be started now", id);
+                                        LOGGER.debug("CELLAR BUNDLE: Error while starting bundle {}.", id, e);
+                                    } else {
+                                        LOGGER.error("CELLAR BUNDLE: failed to pull bundle {}", id, e);
+                                    }
                                 }
                             } else LOGGER.trace("CELLAR BUNDLE: bundle {} is marked BLOCKED INBOUND for cluster group {}", bundleLocation, groupName);
                         }
