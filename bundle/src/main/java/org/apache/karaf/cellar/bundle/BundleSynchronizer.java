@@ -132,8 +132,21 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
             ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
 
             try {
-                // get the bundles on the cluster to update local bundles
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+                // cleanup the local bundles not present on the cluster
+                for (Bundle bundle : bundleContext.getBundles()) {
+                    String id = getId(bundle);
+                    if (!clusterBundles.containsKey(id) && isAllowed(group, Constants.CATEGORY, bundle.getLocation(), EventType.INBOUND)) {
+                        // the bundle is not present on the cluster, so it has to be uninstalled locally
+                        try {
+                            LOGGER.debug("CELLAR BUNDLE: uninstalling local bundle {} which is not present in cluster", id);
+                            bundle.uninstall();
+                        } catch (Exception e) {
+                            LOGGER.warn("Can't uninstall {}", id, e);
+                        }
+                    }
+                }
+                // get the bundles on the cluster to update local bundles
                 for (Map.Entry<String, BundleState> entry : clusterBundles.entrySet()) {
                     String id = entry.getKey();
                     BundleState state = entry.getValue();
@@ -150,6 +163,9 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
                                         if (!isInstalled(state.getLocation())) {
                                             LOGGER.debug("CELLAR BUNDLE: installing bundle located {} on node", state.getLocation());
                                             installBundleFromLocation(state.getLocation());
+                                        } else if (isStarted(state.getLocation())) {
+                                            refreshBundle(findBundle(state.getLocation()));
+                                            LOGGER.debug("CELLAR BUNDLE: refreshing {}/{}", state.getSymbolicName(), state.getVersion());
                                         } else {
                                             LOGGER.debug("CELLAR BUNDLE: bundle located {} already installed on node", state.getLocation());
                                         }
@@ -192,18 +208,6 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
                                     }
                                 }
                             } else LOGGER.trace("CELLAR BUNDLE: bundle {} is marked BLOCKED INBOUND for cluster group {}", bundleLocation, groupName);
-                        }
-                    }
-                }
-                // cleanup the local bundles not present on the cluster
-                for (Bundle bundle : bundleContext.getBundles()) {
-                    String id = getId(bundle);
-                    if (!clusterBundles.containsKey(id) && isAllowed(group, Constants.CATEGORY, bundle.getLocation(), EventType.INBOUND)) {
-                        // the bundle is not present on the cluster, so it has to be uninstalled locally
-                        try {
-                            bundle.uninstall();
-                        } catch (Exception e) {
-                            LOGGER.warn("Can't uninstall {}", id, e);
                         }
                     }
                 }

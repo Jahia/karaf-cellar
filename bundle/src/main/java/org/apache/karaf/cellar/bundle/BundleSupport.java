@@ -20,9 +20,15 @@ import org.apache.karaf.features.FeaturesService;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleException;
+import org.osgi.framework.FrameworkEvent;
+import org.osgi.framework.FrameworkListener;
+import org.osgi.framework.wiring.FrameworkWiring;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * Generic Cellar bundle support.
@@ -182,6 +188,77 @@ public class BundleSupport extends CellarSupport {
             }
         }
         return null;
+    }
+
+
+    /**
+     * Returns the system bundle of the OSGi framework.
+     *
+     * @return the system bundle of the OSGi framework
+     */
+    protected Bundle getSystemBundle() {
+        return bundleContext.getBundle(0);
+    }
+
+    /**
+     * Obtains the {@link FrameworkWiring}.
+     *
+     * @return the {@link FrameworkWiring}
+     */
+    protected FrameworkWiring getFrameworkWiring() {
+        return getSystemBundle().adapt(FrameworkWiring.class);
+    }
+    
+    /**
+     * Refreshes the specified bundle.
+     *
+     * @param bundle the bundle to refresh
+     */
+    protected void refreshBundle(Bundle bundle) {
+        refreshBundles(Collections.singleton(bundle));
+    }
+    
+    /**
+     * Refreshes the specified bundles.
+     *
+     * @param bundlesToRefresh the bundles to refresh
+     */
+    protected void refreshBundles(Collection<Bundle> bundlesToRefresh) {
+        final CountDownLatch latch = new CountDownLatch(1);
+
+        getFrameworkWiring().refreshBundles(bundlesToRefresh, new FrameworkListener() {
+            @Override
+            public void frameworkEvent(FrameworkEvent event) {
+                latch.countDown();
+            }
+        });
+
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            LOGGER.warn("Waiting for refresh of bundles was interrupted", e);
+        }
+    }
+
+    /**
+     * Resolves the specified bundle.
+     *
+     * @param bundle the bundle to be resolved
+     * @return {@code true} if the specified bundle is resolved; {@code false} otherwise.
+     */
+    public boolean resolveBundle(Bundle bundle) {
+        return resolveBundles(Collections.singleton(bundle));
+    }
+
+    /**
+     * Resolves the specified bundles.
+     *
+     * @param bundlesToResolve
+     *            the bundles to resolve or {@code null} to resolve all unresolved bundles installed in the Framework
+     * @return {@code true} if all specified bundles are resolved; {@code false} otherwise.
+     */
+    protected boolean resolveBundles(Collection<Bundle> bundlesToResolve) {
+        return getFrameworkWiring().resolveBundles(bundlesToResolve);
     }
 
 }
