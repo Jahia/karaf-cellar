@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.Dictionary;
 import java.util.Map;
 import java.util.Set;
@@ -158,20 +159,13 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
                             if (isAllowed(group, Constants.CATEGORY, bundleLocation, EventType.INBOUND)) {
                                 try {
                                     if (state.getStatus() == Bundle.INSTALLED) {
-                                        if (!isInstalled(state.getLocation())) {
-                                            LOGGER.debug("CELLAR BUNDLE: installing bundle located {} on node", state.getLocation());
-                                            installBundleFromLocation(state.getLocation());
-                                        } else if (isStarted(state.getLocation())) {
+                                        ensureInstalled(state);
+                                        if (isStarted(state.getLocation())) {
                                             refreshBundle(findBundle(state.getLocation()));
                                             LOGGER.debug("CELLAR BUNDLE: refreshing {}/{}", state.getSymbolicName(), state.getVersion());
-                                        } else {
-                                            LOGGER.debug("CELLAR BUNDLE: bundle located {} already installed on node", state.getLocation());
                                         }
                                     } else if (state.getStatus() == Bundle.ACTIVE) {
-                                        if (!isInstalled(state.getLocation())) {
-                                            LOGGER.debug("CELLAR BUNDLE: installing bundle located {} on node", state.getLocation());
-                                            installBundleFromLocation(state.getLocation());
-                                        }
+                                        ensureInstalled(state);
                                         if (!isStarted(state.getLocation())) {
                                             LOGGER.debug("CELLAR BUNDLE: starting bundle {}/{} on node", symbolicName, version);
                                             startBundle(symbolicName, version);
@@ -179,10 +173,7 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
                                             LOGGER.debug("CELLAR BUNDLE: bundle located {} already started on node", state.getLocation());
                                         }
                                     } else if (state.getStatus() == Bundle.RESOLVED) {
-                                        if (!isInstalled(state.getLocation())) {
-                                            LOGGER.debug("CELLAR BUNDLE: installing bundle located {} on node", state.getLocation());
-                                            installBundleFromLocation(state.getLocation());
-                                        }
+                                        ensureInstalled(state);                                        
                                         Bundle b = findBundle(state.getLocation());
                                         if (b != null) {
                                             if (b.getState() == Bundle.ACTIVE) {
@@ -350,6 +341,49 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
         }
 
         return "disabled";
+    }
+
+    /**
+     * Installs the bundle which corresponds to the supplied state if it is not installed yet. If it is already installed, performs its
+     * update if needed (based on the last modified date).
+     * 
+     * @param state the cluster bundle state
+     * @throws BundleException in case of bundle operation errors
+     */
+    private void ensureInstalled(BundleState state) throws BundleException {
+        Bundle existingBundle = findBundle(state.getLocation());
+        if (existingBundle == null) {
+            LOGGER.debug("CELLAR BUNDLE: installing bundle located {} on node", state.getLocation());
+            installBundleFromLocation(state.getLocation());
+        } else if (requiresUpdate(existingBundle)) {
+            LOGGER.debug("CELLAR BUNDLE: updating bundle located {} on node", state.getLocation());
+            existingBundle.update();
+        } else {
+            LOGGER.debug("CELLAR BUNDLE: bundle located {} already installed on node", state.getLocation());
+        }
+    }
+
+    private boolean requiresUpdate(Bundle bundle) {
+        long currentLastModified = bundle.getLastModified();
+        if (currentLastModified <= 0) {
+            return false;
+        }
+
+        String location = bundle.getLocation();
+        try {
+            long newLastModified = new URL(location).openConnection().getLastModified();
+            return newLastModified > 0 && newLastModified > currentLastModified;
+        } catch (IOException e) {
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Unable to obtain last modified date for the location " + location + " of the bundle "
+                        + bundle + ". Cause: " + e.getMessage(), e);
+            } else {
+                LOGGER.warn("Unable to obtain last modified date for the location {} of the bundle {}. Cause: {}",
+                        new Object[] { location, bundle, e.getMessage() });
+            }
+        }
+
+        return false;
     }
 
 }
