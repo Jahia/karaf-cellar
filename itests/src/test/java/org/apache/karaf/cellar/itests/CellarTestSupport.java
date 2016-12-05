@@ -35,6 +35,7 @@ import java.util.concurrent.TimeoutException;
 import javax.inject.Inject;
 import javax.security.auth.Subject;
 
+import org.apache.karaf.jaas.boot.principal.RolePrincipal;
 import org.apache.karaf.shell.api.console.Session;
 import org.apache.karaf.shell.api.console.SessionFactory;
 import org.ops4j.pax.exam.*;
@@ -49,7 +50,8 @@ import org.osgi.framework.ServiceReference;
 import org.osgi.util.tracker.ServiceTracker;
 
 public class CellarTestSupport {
-
+    protected static final RolePrincipal ADMIN_PRINCIPAL = new RolePrincipal("admin"); 
+    
     static final Long COMMAND_TIMEOUT = 10000L;
     static final Long DEFAULT_TIMEOUT = 20000L;
     static final Long SERVICE_TIMEOUT = 30000L;
@@ -110,11 +112,11 @@ public class CellarTestSupport {
         System.err.println(executeCommand("feature:repo-add " + System.getProperty("cellar.feature.url")));
         System.err.println(executeCommand("feature:repo-list"));
         System.err.println(executeCommand("feature:list"));
-        executeCommand("feature:install cellar");
+        executeCommand("feature:install cellar", ADMIN_PRINCIPAL);
     }
 
     protected void unInstallCellar() {
-        System.err.println(executeCommand("feature:uninstall cellar"));
+        System.err.println(executeCommand("feature:uninstall cellar", ADMIN_PRINCIPAL));
     }
 
     /**
@@ -158,8 +160,11 @@ public class CellarTestSupport {
      * Destroys the child node.
      */
     protected void destroyCellarChild(String name) {
-        System.err.println(executeCommand("instance:connect " + name + " feature:uninstall cellar"));
-        System.err.println(executeCommand("instance:stop " + name));
+        try {
+            System.err.println(executeCommand("instance:connect -u karaf -p karaf " + name + " feature:uninstall cellar"));
+        } finally {
+            System.err.println(executeCommand("instance:stop " + name));
+        }
     }
 
     /**
@@ -187,7 +192,8 @@ public class CellarTestSupport {
         Option[] options = new Option[]{
                 cellarDistributionConfiguration(), keepRuntimeFolder(), logLevel(LogLevelOption.LogLevel.INFO),
                 editConfigurationFileExtend("etc/system.properties", "cellar.feature.url", maven().groupId("org.apache.karaf.cellar").artifactId("apache-karaf-cellar").versionAsInProject().classifier("features").type("xml").getURL()),
-                editConfigurationFileExtend("etc/config.properties", "org.apache.aries.blueprint.synchronous", "true")
+                editConfigurationFileExtend("etc/config.properties", "org.apache.aries.blueprint.synchronous", "true"),
+                editConfigurationFileExtend("etc/keys.properties", "karaf", "AAAAB3NzaC1kc3MAAACBAP1/U4EddRIpUt9KnC7s5Of2EbdSPO9EAMMeP4C2USZpRV1AIlH7WT2NWPq/xfW6MPbLm1Vs14E7gB00b/JmYLdrmVClpJ+f6AR7ECLCT7up1/63xhv4O1fnxqimFQ8E+4P208UewwI1VBNaFpEy9nXzrith1yrv8iIDGZ3RSAHHAAAAFQCXYFCPFSMLzLKSuYKi64QL8Fgc9QAAAIEA9+GghdabPd7LvKtcNrhXuXmUr7v6OuqC+VdMCz0HgmdRWVeOutRZT+ZxBxCBgLRJFnEj6EwoFhO3zwkyjMim4TwWeotUfI0o4KOuHiuzpnWRbqN/C/ohNWLx+2J6ASQ7zKTxvqhRkImog9/hWuWfBpKLZl6Ae1UlZAFMO/7PSSoAAACBAKKSU2PFl/qOLxIwmBZPPIcJshVe7bVUpFvyl3BbJDow8rXfskl8wO63OzP/qLmcJM0+JbcRU/53JjTuyk31drV2qxhIOsLDC9dGCWj47Y7TyhPdXh/0dthTRBy6bqGtRPxGa7gJov1xm/UuYYXPIUR/3x9MAZvZ5xvE0kYXO+rx,_g_:admingroup"),
         };
         String debug = System.getProperty("debugMain");
         if (debug != null) {

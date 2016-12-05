@@ -14,6 +14,8 @@
 package org.apache.karaf.cellar.hazelcast;
 
 import com.hazelcast.core.*;
+import com.hazelcast.core.LifecycleEvent.LifecycleState;
+
 import org.apache.karaf.cellar.core.Group;
 import org.apache.karaf.cellar.core.GroupManager;
 import org.apache.karaf.cellar.core.Synchronizer;
@@ -26,7 +28,7 @@ import java.util.Set;
 /**
  * Cellar membership listener.
  */
-public class CellarMembershipListener extends HazelcastInstanceAware implements MembershipListener {
+public class CellarMembershipListener extends HazelcastInstanceAware implements MembershipListener, LifecycleListener {
 
     private static final transient Logger LOGGER = LoggerFactory.getLogger(CellarMembershipListener.class);
 
@@ -36,11 +38,13 @@ public class CellarMembershipListener extends HazelcastInstanceAware implements 
     public CellarMembershipListener(HazelcastInstance instance) {
         this.instance = instance;
         instance.getCluster().addMembershipListener(this);
+        instance.getLifecycleService().addLifecycleListener(this);
     }
 
     @Override
     public void memberAdded(MembershipEvent membershipEvent) {
         Member member = membershipEvent.getMember();
+        LOGGER.info("Member is added to the cluster: {}", member);
         try {
             Member local = instance.getCluster().getLocalMember();
 
@@ -62,6 +66,7 @@ public class CellarMembershipListener extends HazelcastInstanceAware implements 
     @Override
     public void memberRemoved(MembershipEvent membershipEvent) {
         // nothing to do
+        LOGGER.info("Member has left the cluster: {}", membershipEvent.getMember());
     }
 
     @Override
@@ -83,6 +88,24 @@ public class CellarMembershipListener extends HazelcastInstanceAware implements 
 
     public void setSynchronizers(List<? extends Synchronizer> synchronizers) {
         this.synchronizers = synchronizers;
+    }
+
+    @Override
+    public void stateChanged(LifecycleEvent event) {
+        if (instance != null && event.getState().equals(LifecycleState.MERGED)) {
+            LOGGER.info("\n\n\n{} finished merging state with the cluster\n\n\n", instance.getCluster().getLocalMember());
+            if (synchronizers != null && !synchronizers.isEmpty()) {
+                Set<Group> groups = groupManager.listLocalGroups();
+                if (groups != null && !groups.isEmpty()) {
+                    for (Group group : groups) {
+                        for (Synchronizer synchronizer : synchronizers) {
+                            synchronizer.sync(group);
+                        }
+                    }
+                }
+            }
+            
+        }
     }
 
 }
