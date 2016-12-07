@@ -127,11 +127,22 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
             String groupName = group.getName();
             LOGGER.debug("CELLAR BUNDLE: pulling bundles from cluster group {}", groupName);
             Map<String, BundleState> clusterBundles = clusterManager.getMap(Constants.BUNDLE_MAP + Configurations.SEPARATOR + groupName);
+            LOGGER.debug("Retrieved clustered state with {} bundles", clusterBundles.size());
+            for (Map.Entry<String, BundleState> entry : clusterBundles.entrySet()) {
+                LOGGER.debug("{}: {}", entry.getKey(), entry.getValue().getStatus());
+            }
 
             ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
 
             try {
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+                for (Bundle bundle : bundleContext.getBundles()) {
+                    String id = getId(bundle);
+                    if (!clusterBundles.containsKey(id)) {
+                        LOGGER.debug("Local bundle {} is not present in cluster", id);
+                    }
+                    
+                }
                 // cleanup the local bundles not present on the cluster
                 for (Bundle bundle : bundleContext.getBundles()) {
                     String id = getId(bundle);
