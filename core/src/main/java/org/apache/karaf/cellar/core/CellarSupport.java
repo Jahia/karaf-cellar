@@ -202,7 +202,7 @@ public class CellarSupport {
             }
         }
 
-        return false;
+        return result;
     }
 
     /**
