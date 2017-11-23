@@ -118,6 +118,7 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
             String groupName = group.getName();
             LOGGER.debug("CELLAR BUNDLE: pulling bundles from cluster group {}", groupName);
             Map<String, BundleState> clusterBundles = clusterManager.getMap(Constants.BUNDLE_MAP + Configurations.SEPARATOR + groupName);
+            Map<String, Boolean> synchronizers = clusterManager.getMap("org.apache.karaf.cellar.bundle.synchronizers");
 
             ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
 
@@ -192,7 +193,7 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
                     }
                 }
                 // cleanup the local bundles not present on the cluster if the node is not the first one in the cluster group
-                if (clusterManager.listNodesByGroup(group).size() > 1) {
+                if (synchronizers.containsKey(Constants.BUNDLE_MAP + Configurations.SEPARATOR + groupName)) {
                     for (Bundle bundle : bundleContext.getBundles()) {
                         String id = getId(bundle);
                         if (!clusterBundles.containsKey(id) && isAllowed(group, Constants.CATEGORY, bundle.getLocation(), EventType.INBOUND)) {
@@ -228,6 +229,7 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
             String groupName = group.getName();
             LOGGER.debug("CELLAR BUNDLE: pushing bundles to cluster group {}", groupName);
             Map<String, BundleState> clusterBundles = clusterManager.getMap(Constants.BUNDLE_MAP + Configurations.SEPARATOR + groupName);
+            Map<String, Boolean> synchronizers = clusterManager.getMap("org.apache.karaf.cellar.bundle.synchronizers");
 
             ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
             try {
@@ -307,6 +309,7 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
                         }
                     }
                 }
+                synchronizers.put(Constants.BUNDLE_MAP + Configurations.SEPARATOR + groupName, true);
             } finally {
                 Thread.currentThread().setContextClassLoader(originalClassLoader);
             }
