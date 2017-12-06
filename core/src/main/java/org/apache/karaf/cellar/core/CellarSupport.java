@@ -177,7 +177,7 @@ public class CellarSupport {
 
         if (blackList == null || whiteList == null) {
             // If one list is missing, we probably have a configuration issue - do not synchronize anything
-            LOGGER.warn("No whitelist/blacklist found for "+group + ", check your configuration !");
+            LOGGER.warn("No whitelist/blacklist found for "+group.getName() + ", check your configuration !");
             return false;
         }
 
