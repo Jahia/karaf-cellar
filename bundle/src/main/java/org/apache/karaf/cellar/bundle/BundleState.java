@@ -29,6 +29,7 @@ public class BundleState implements Serializable {
     private String location;
     private int status;
     private byte[] data;
+    private long lastModified;
 
     public long getId() {
         return id;
@@ -76,6 +77,7 @@ public class BundleState implements Serializable {
 
     public void setStatus(int status) {
         this.status = status;
+        this.lastModified = System.currentTimeMillis();
     }
 
     public byte[] getData() {
@@ -84,6 +86,10 @@ public class BundleState implements Serializable {
 
     public void setData(byte[] data) {
         this.data = data.clone();
+    }
+
+    public long getLastModified() {
+        return lastModified;
     }
 
 }
