@@ -19,6 +19,7 @@ import org.apache.karaf.cellar.core.control.SwitchStatus;
 import org.apache.karaf.cellar.core.event.EventProducer;
 import org.apache.karaf.cellar.core.event.EventType;
 import org.apache.karaf.features.Feature;
+import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleEvent;
 import org.osgi.framework.SynchronousBundleListener;
 import org.osgi.service.cm.Configuration;
@@ -99,10 +100,14 @@ public class LocalBundleListener extends BundleSupport implements SynchronousBun
                         try {
                             // update bundles in the cluster group
                             Map<String, BundleState> clusterBundles = clusterManager.getMap(Constants.BUNDLE_MAP + Configurations.SEPARATOR + group.getName());
+                            String id = symbolicName + "/" + version;
+                            BundleState state = clusterBundles.get(id);
                             if (event.getType() == BundleEvent.UNINSTALLED) {
-                                clusterBundles.remove(symbolicName + "/" + version);
+                                if (state != null) {
+                                    state.setStatus(Bundle.UNINSTALLED);
+                                    clusterBundles.put(id, state);
+                                }
                             } else {
-                                BundleState state = clusterBundles.get(symbolicName + "/" + version);
                                 if (state == null) {
                                     state = new BundleState();
                                 }
@@ -112,7 +117,7 @@ public class LocalBundleListener extends BundleSupport implements SynchronousBun
                                 state.setSymbolicName(symbolicName);
                                 state.setStatus(status);
                                 state.setLocation(bundleLocation);
-                                clusterBundles.put(symbolicName + "/" + version, state);
+                                clusterBundles.put(id, state);
                             }
 
                             // check the features first
