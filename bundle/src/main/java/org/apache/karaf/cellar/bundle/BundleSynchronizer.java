@@ -31,9 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URL;
-import java.util.Collections;
 import java.util.Dictionary;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -126,8 +124,6 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
             try {
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
 
-                Map<String, BundleState> clusterBundlesInOtherGroups = getClusterBundlesInOtherGroups(groupName);
-
                 // get the bundles on the cluster to update local bundles
                 for (Map.Entry<String, BundleState> entry : clusterBundles.entrySet()) {
                     String id = entry.getKey();
@@ -137,8 +133,7 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
                     if (tokens.length == 2) {
                         String symbolicName = tokens[0];
                         String version = tokens[1];
-                        if (state != null && (!clusterBundlesInOtherGroups.containsKey(id)
-                                || clusterBundlesInOtherGroups.get(id).getLastModified() <= state.getLastModified())) {
+                        if (state != null) {
                             String bundleLocation = state.getLocation();
                             if (isAllowed(group, Constants.CATEGORY, bundleLocation, EventType.INBOUND)) {
                                 try {
@@ -170,9 +165,6 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
                                         } else {
                                             LOGGER.warn("CELLAR BUNDLE: unable to find bundle located {} on node", state.getLocation());
                                         }
-                                    } else if (state.getStatus() == Bundle.UNINSTALLED) {
-                                        LOGGER.debug("CELLAR BUNDLE: uninstalling bundle {}/{} on node", symbolicName, version);
-                                        uninstallBundle(symbolicName, version);
                                     }
                                 } catch (BundleException e) {
                                     if (BundleException.RESOLVE_ERROR == e.getType()) {
@@ -191,7 +183,7 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
                 if (getSynchronizerMap().containsKey(Constants.BUNDLE_MAP + Configurations.SEPARATOR + groupName)) {
                     for (Bundle bundle : bundleContext.getBundles()) {
                         String id = getId(bundle);
-                        if (!clusterBundles.containsKey(id) && !clusterBundlesInOtherGroups.containsKey(id) && isAllowed(group, Constants.CATEGORY, bundle.getLocation(), EventType.INBOUND)) {
+                        if (!clusterBundles.containsKey(id) && isAllowed(group, Constants.CATEGORY, bundle.getLocation(), EventType.INBOUND)) {
                             // the bundle is not present on the cluster, so it has to be uninstalled locally
                             try {
                                 LOGGER.debug("CELLAR BUNDLE: uninstalling local bundle {} which is not present in cluster", id);
@@ -229,12 +221,6 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
             ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
             try {
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
-
-                Map<String, BundleState> clusterBundlesInOtherGroups = getSynchronizerMap()
-                        .containsKey(Constants.BUNDLE_MAP + Configurations.SEPARATOR + groupName)
-                                ? getClusterBundlesInOtherGroups(groupName)
-                                : Collections.<String, BundleState> emptyMap();
-
                 Bundle[] bundles;
                 BundleContext bundleContext = ((BundleReference) getClass().getClassLoader()).getBundle().getBundleContext();
 
@@ -252,35 +238,31 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
                     // check if the pid is marked as local.
                     if (isAllowed(group, Constants.CATEGORY, bundleLocation, EventType.OUTBOUND)) {
                         if (!clusterBundles.containsKey(id)) {
-                            if (!clusterBundlesInOtherGroups.containsKey(id)) {
-                                LOGGER.debug("CELLAR BUNDLE: deploying bundle {} on the cluster", id);
-                                BundleState bundleState = new BundleState();
-                                // get the bundle name or location.
-                                String name = (String) bundle.getHeaders().get(org.osgi.framework.Constants.BUNDLE_NAME);
-                                // if there is no name, then default to symbolic name.
-                                name = (name == null) ? symbolicName : name;
-                                // if there is no symbolic name, resort to location.
-                                name = (name == null) ? bundle.getLocation() : name;
-                                bundleState.setId(bundleId);
-                                bundleState.setName(name);
-                                bundleState.setSymbolicName(symbolicName);
-                                bundleState.setVersion(version);
-                                bundleState.setLocation(bundleLocation);
-                                bundleState.setStatus(status);
-                                // update cluster state
-                                clusterBundles.put(id, bundleState);
-                                // send cluster event
-                                ClusterBundleEvent clusterEvent = new ClusterBundleEvent(symbolicName, version, bundleLocation, status);
-                                clusterEvent.setSourceGroup(group);
-                                clusterEvent.setSourceNode(clusterManager.getNode());
-                                clusterEvent.setLocal(clusterManager.getNode());
-                                eventProducer.produce(clusterEvent);
-                            }
+                            LOGGER.debug("CELLAR BUNDLE: deploying bundle {} on the cluster", id);
+                            BundleState bundleState = new BundleState();
+                            // get the bundle name or location.
+                            String name = (String) bundle.getHeaders().get(org.osgi.framework.Constants.BUNDLE_NAME);
+                            // if there is no name, then default to symbolic name.
+                            name = (name == null) ? symbolicName : name;
+                            // if there is no symbolic name, resort to location.
+                            name = (name == null) ? bundle.getLocation() : name;
+                            bundleState.setId(bundleId);
+                            bundleState.setName(name);
+                            bundleState.setSymbolicName(symbolicName);
+                            bundleState.setVersion(version);
+                            bundleState.setLocation(bundleLocation);
+                            bundleState.setStatus(status);
+                            // update cluster state
+                            clusterBundles.put(id, bundleState);
+                            // send cluster event
+                            ClusterBundleEvent clusterEvent = new ClusterBundleEvent(symbolicName, version, bundleLocation, status);
+                            clusterEvent.setSourceGroup(group);
+                            clusterEvent.setSourceNode(clusterManager.getNode());
+                            clusterEvent.setLocal(clusterManager.getNode());
+                            eventProducer.produce(clusterEvent);
                         } else {
                             BundleState bundleState = clusterBundles.get(id);
-                            if (bundleState.getStatus() != status
-                                    && (!clusterBundlesInOtherGroups.containsKey(id) || clusterBundlesInOtherGroups
-                                            .get(id).getLastModified() <= bundleState.getLastModified())) {
+                            if (bundleState.getStatus() != status) {
                                 LOGGER.debug("CELLAR BUNDLE: updating bundle {} on the cluster", id);
                                 // update cluster state
                                 bundleState.setStatus(status);
@@ -300,7 +282,7 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
                 for (Map.Entry<String, BundleState> entry : clusterBundles.entrySet()) {
                     String id = entry.getKey();
                     BundleState state = entry.getValue();
-                    if (state != null && !clusterBundlesInOtherGroups.containsKey(id) && isAllowed(group, Constants.CATEGORY, state.getLocation(), EventType.OUTBOUND)) {
+                    if (state != null && isAllowed(group, Constants.CATEGORY, state.getLocation(), EventType.OUTBOUND)) {
                         boolean found = false;
                         for (Bundle bundle : bundleContext.getBundles()) {
                             String localBundleId = getId(bundle);
@@ -399,42 +381,6 @@ public class BundleSynchronizer extends BundleSupport implements Synchronizer {
         }
 
         return false;
-    }
-
-    /**
-     * Returns bundles with their states, which are present in local groups of this node, other than the provided group. The map always
-     * contains "latest" bundle states (by last modified timestamp), i.e. if two groups contain same bundle ID, the bundle state with the
-     * latest timestamp will be taken.
-     * 
-     * @param groupName
-     *            the current group name
-     * @return a map of bundles and their states
-     */
-    @SuppressWarnings("unchecked")
-    private Map<String, BundleState> getClusterBundlesInOtherGroups(String groupName) {
-        Map<String, BundleState> clusterBundlesInOtherGroups = new HashMap<String, BundleState>();
-        Set<Group> groups = groupManager.listLocalGroups();
-        if (groups != null && !groups.isEmpty()) {
-            for (Group g : groups) {
-                String otherGroupName = g.getName();
-                if (!groupName.equals(otherGroupName)) {
-                    Map<String, BundleState> states = clusterManager
-                            .getMap(Constants.BUNDLE_MAP + Configurations.SEPARATOR + otherGroupName);
-                    if (clusterBundlesInOtherGroups.isEmpty()) {
-                        clusterBundlesInOtherGroups.putAll(states);
-                    } else {
-                        for (Map.Entry<String, BundleState> state : states.entrySet()) {
-                            BundleState existingState = clusterBundlesInOtherGroups.get(state.getKey());
-                            if (existingState == null
-                                    || existingState.getLastModified() < state.getValue().getLastModified()) {
-                                clusterBundlesInOtherGroups.put(state.getKey(), state.getValue());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return clusterBundlesInOtherGroups;
     }
 
 }
