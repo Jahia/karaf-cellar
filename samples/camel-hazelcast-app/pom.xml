@@ -24,7 +24,7 @@
     <parent>
         <artifactId>samples</artifactId>
         <groupId>org.apache.karaf.cellar</groupId>
-        <version>4.0.2-jahia5</version>
+        <version>4.0.2-jahia6-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
