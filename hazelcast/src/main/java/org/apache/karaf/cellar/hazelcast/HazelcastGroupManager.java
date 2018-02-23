@@ -464,7 +464,7 @@ public class HazelcastGroupManager implements GroupManager, EntryListener<String
             group.getNodes().add(node);
             Map<Node, Set<String>> map = getClusterGroups();
             Set<String> groupNames = (Set<String>) map.get(node);
-            groupNames = groupNames != null ? new HashSet<String>(groupNames) : new HashSet<String>();
+            groupNames = new HashSet<String>(groupNames);
             groupNames.add(groupName);
             map.put(node, groupNames);
 
@@ -575,7 +575,7 @@ public class HazelcastGroupManager implements GroupManager, EntryListener<String
             group.getNodes().add(node);
             Map<Node, Set<String>> map = getClusterGroups();
             Set<String> groupNames = (Set<String>) map.get(node);
-            groupNames = groupNames != null ? new HashSet<String>(groupNames) : new HashSet<String>();
+            groupNames = new HashSet<String>(groupNames);
             groupNames.remove(groupName);
             map.put(node, groupNames);
 
