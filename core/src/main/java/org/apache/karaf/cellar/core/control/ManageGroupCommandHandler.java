@@ -18,6 +18,7 @@ import org.apache.karaf.cellar.core.Group;
 import org.apache.karaf.cellar.core.Node;
 import org.apache.karaf.cellar.core.command.CommandHandler;
 
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -48,7 +49,8 @@ public class ManageGroupCommandHandler extends CommandHandler<ManageGroupCommand
             purgeGroups();
             joinGroup(Configurations.DEFAULT_GROUP_NAME);
         } else if (ManageGroupAction.SET.equals(action)) {
-            Group localGroup = groupManager.listLocalGroups().iterator().next();
+            Iterator<Group> iterator = groupManager.listLocalGroups().iterator();
+            Group localGroup = iterator.next();
             quitGroup(localGroup.getName());
             joinGroup(targetGroupName);
         }
