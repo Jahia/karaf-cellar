@@ -50,8 +50,10 @@ public class ManageGroupCommandHandler extends CommandHandler<ManageGroupCommand
             joinGroup(Configurations.DEFAULT_GROUP_NAME);
         } else if (ManageGroupAction.SET.equals(action)) {
             Iterator<Group> iterator = groupManager.listLocalGroups().iterator();
-            Group localGroup = iterator.next();
-            quitGroup(localGroup.getName());
+            Group localGroup = iterator.hasNext() ? iterator.next() : null;
+            if (localGroup != null) {
+                quitGroup(localGroup.getName());
+            }
             joinGroup(targetGroupName);
         }
 
