@@ -30,7 +30,7 @@
 
     <groupId>org.apache.karaf</groupId>
     <artifactId>cellar</artifactId>
-    <version>4.0.2-jahia9-SNAPSHOT</version>
+    <version>4.0.2-jahia9</version>
     <packaging>pom</packaging>
     <name>Apache Karaf :: Cellar</name>
 
@@ -52,7 +52,7 @@
         <gson.version>2.3</gson.version>
         <bnd.version.policy>[$(version;==;$(@)),$(version;+;$(@)))</bnd.version.policy>
     </properties>
-    
+
     <repositories>
         <repository>
             <id>jahia-public</id>
