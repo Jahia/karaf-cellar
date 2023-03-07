@@ -217,7 +217,9 @@ public class ConfigurationSupport extends CellarSupport {
 
     /**
      * Persist a configuration to a storage.
-     * @param cfg the configuration to store.
+     * @param pid the pid of the configuration.
+     * @param localDictionary the local dictionary of configuration properties
+     * @param clusterDictionary the cluster dictionary of configuration properties
      */
     protected void persistConfiguration(String pid, Dictionary localDictionary, Dictionary clusterDictionary) {
         try {
