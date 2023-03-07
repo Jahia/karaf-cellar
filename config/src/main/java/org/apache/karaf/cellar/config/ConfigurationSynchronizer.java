@@ -141,7 +141,7 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                                 if (!equals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary) && shouldReplicateConfig(clusterDictionary)) {
                                     LOGGER.debug("CELLAR CONFIG: updating configration {} on node", pid);
                                     Dictionary convertedDictionary = convertPropertiesFromCluster(clusterDictionary);
-                                    persistConfiguration(localConfiguration.getPid(), localConfiguration.getFactoryPid(), localConfiguration.getProperties(), clusterDictionary);
+                                    persistConfiguration(localConfiguration.getPid(), localConfiguration.getProperties(), clusterDictionary);
                                     localConfiguration.update(convertedDictionary);
                                 }
                             } catch (IOException ex) {

@@ -219,7 +219,7 @@ public class ConfigurationSupport extends CellarSupport {
      * Persist a configuration to a storage.
      * @param cfg the configuration to store.
      */
-    protected void persistConfiguration(String pid, String factoryPid, Dictionary localDictionary, Dictionary clusterDictionary) {
+    protected void persistConfiguration(String pid, Dictionary localDictionary, Dictionary clusterDictionary) {
         try {
             File storageFile = getStorageFile(localDictionary);
 
