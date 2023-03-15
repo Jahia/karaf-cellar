@@ -225,18 +225,27 @@ public class ConfigurationSupport extends CellarSupport {
         try {
             File storageFile = getStorageFile(localDictionary);
 
+            if (storageFile == null && clusterDictionary != null && clusterDictionary.get(KARAF_CELLAR_FILENAME) != null) {
+                LOGGER.debug("Getting filename from cluster dictionary {}", clusterDictionary.get(KARAF_CELLAR_FILENAME));
+                storageFile = new File(storage, (String) clusterDictionary.get(KARAF_CELLAR_FILENAME));
+            }
+
             if (storageFile == null && (localDictionary != null && localDictionary.get(ConfigurationAdmin.SERVICE_FACTORYPID) != null)) {
+                LOGGER.debug("Creating filename from pid : {}", pid + ".cfg");
                 storageFile = new File(storage, pid + ".cfg");
             }
+
             if( storageFile == null) {
+                LOGGER.debug("Cannot find storage filename {}, localDictionary is null = {}, clusterDictionary contains filename = {}", pid, localDictionary == null, clusterDictionary.get(KARAF_CELLAR_FILENAME) != null);
                 return;
             }
+
             String name = storageFile.getName().toLowerCase();
             boolean isCfg = name.endsWith(".cfg") || name.endsWith(".config");
             boolean isYml = name.endsWith(".yml") || name.endsWith(".yaml");
 
             if (!isCfg && !isYml) {
-                // it's a factory configuration without filename specified, cannot save
+                LOGGER.debug("Filename is neither cfg or yml, skipping");
                 return;
             }
 
