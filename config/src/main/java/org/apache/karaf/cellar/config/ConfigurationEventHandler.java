@@ -100,13 +100,13 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
                             }
                             localDictionary = filter(localDictionary);
                             if (!equals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary)) {
-                                Dictionary convertedDictionary = convertPropertiesFromCluster(clusterDictionary);
                                 persistConfiguration(localConfiguration.getPid(), localConfiguration.getProperties(), clusterDictionary);
-                                localConfiguration.update(convertedDictionary);
-                                if (!clusterConfigurations.containsKey(localConfiguration.getPid())) {
-                                    Properties p = dictionaryToProperties(filter(localConfiguration.getProperties()));
+                                Dictionary convertedDictionary = convertPropertiesFromCluster(clusterDictionary);
+                                Properties p = dictionaryToProperties(filter(convertedDictionary));
+                                if (!localConfiguration.getPid().equals(pid)) {
                                     clusterConfigurations.put(localConfiguration.getPid(), p);
                                 }
+                                localConfiguration.update(convertedDictionary);
                             }
                         }
                     }
