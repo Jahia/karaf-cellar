@@ -101,6 +101,7 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
 
                                 if (!equals(localDictionary, distributedDictionary) && canDistributeConfig(localDictionary)) {
                                     // update the configurations in the cluster group
+                                    LOGGER.debug("Storing configuration {} in cluster {}", pid, localDictionary);
                                     clusterConfigurations.put(pid, dictionaryToProperties(localDictionary));
                                     // send the cluster event
                                     ClusterConfigurationEvent clusterConfigurationEvent = new ClusterConfigurationEvent(pid);

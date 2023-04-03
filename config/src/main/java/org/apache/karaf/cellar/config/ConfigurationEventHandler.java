@@ -76,6 +76,8 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
         if (isAllowed(event.getSourceGroup(), Constants.CATEGORY, pid, EventType.INBOUND)) {
             synchronized (clusterConfigurations) {
                 Dictionary clusterDictionary = clusterConfigurations.get(pid);
+                LOGGER.debug("Received event for configuration {} , cluster data : {}", pid, clusterDictionary);
+
                 try {
                     // update the local configuration
                     Configuration localConfiguration = findLocalConfiguration(pid, clusterDictionary);
@@ -104,6 +106,7 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
                                 Dictionary convertedDictionary = convertPropertiesFromCluster(clusterDictionary);
                                 if (!localConfiguration.getPid().equals(pid)) {
                                     Properties p = dictionaryToProperties(filter(convertedDictionary));
+                                    LOGGER.debug("Storing factory configuration local pid: {}, from {} : {}", localConfiguration.getProperties(), pid, localDictionary);
                                     clusterConfigurations.put(localConfiguration.getPid(), p);
                                 }
                                 localConfiguration.update(convertedDictionary);
