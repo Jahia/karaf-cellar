@@ -25,6 +25,7 @@ import org.osgi.service.cm.ConfigurationEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.Dictionary;
 import java.util.Map;
 import java.util.Properties;
@@ -76,6 +77,8 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
         if (isAllowed(event.getSourceGroup(), Constants.CATEGORY, pid, EventType.INBOUND)) {
             synchronized (clusterConfigurations) {
                 Dictionary clusterDictionary = clusterConfigurations.get(pid);
+                LOGGER.debug("Received event for configuration {} , cluster data : {}", pid, Collections.list(clusterDictionary.keys()));
+
                 try {
                     // update the local configuration
                     Configuration localConfiguration = findLocalConfiguration(pid, clusterDictionary);
@@ -104,6 +107,7 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
                                 Dictionary convertedDictionary = convertPropertiesFromCluster(clusterDictionary);
                                 if (!localConfiguration.getPid().equals(pid)) {
                                     Properties p = dictionaryToProperties(filter(convertedDictionary));
+                                    LOGGER.debug("Storing factory configuration local pid: {}, from {} : {}", localConfiguration.getProperties(), pid, Collections.list(localDictionary.keys()));
                                     clusterConfigurations.put(localConfiguration.getPid(), p);
                                 }
                                 localConfiguration.update(convertedDictionary);

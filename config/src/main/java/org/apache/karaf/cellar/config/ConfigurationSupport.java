@@ -124,6 +124,7 @@ public class ConfigurationSupport extends CellarSupport {
                     try {
                         result.put(KARAF_CELLAR_CONTENT, readFile(new File(storage, value)));
                     } catch (IOException e) {
+                        LOGGER.debug("Cannot read file content for {}", value);
                         // Cannot read file
                     }
                 } else if (!isExcludedProperty(key)) {
@@ -250,41 +251,11 @@ public class ConfigurationSupport extends CellarSupport {
             }
 
             String content = clusterDictionary == null ? null : (String) clusterDictionary.get(KARAF_CELLAR_CONTENT);
-
-            if (content == null && isCfg) {
-                LOGGER.debug("Persisting file base on properties, has content was null in KARAF_CELLAR_CONTENT");
-                org.apache.felix.utils.properties.Properties p = new org.apache.felix.utils.properties.Properties(storageFile);
-                List<String> propertiesToRemove = new ArrayList<String>();
-                Set<String> set = p.keySet();
-
-                for (String key : set) {
-                    if (!org.osgi.framework.Constants.SERVICE_PID.equals(key)
-                            && !ConfigurationAdmin.SERVICE_FACTORYPID.equals(key)
-                            && !KARAF_CELLAR_FILENAME.equals(key)
-                            && !FELIX_FILEINSTALL_FILENAME.equals(key)) {
-                        propertiesToRemove.add(key);
-                    }
-                }
-
-                for (String key : propertiesToRemove) {
-                    p.remove(key);
-                }
-                for (Enumeration<String> keys = localDictionary.keys(); keys.hasMoreElements(); ) {
-                    String key = keys.nextElement();
-                    if (!org.osgi.framework.Constants.SERVICE_PID.equals(key)
-                            && !ConfigurationAdmin.SERVICE_FACTORYPID.equals(key)
-                            && !KARAF_CELLAR_FILENAME.equals(key)
-                            && !FELIX_FILEINSTALL_FILENAME.equals(key)) {
-                        p.put(key, (String) localDictionary.get(key));
-                    }
-                }
-
-                // save the cfg file
-                storage.mkdirs();
-                p.save();
-            } else if (content != null) {
+            if (content != null) {
                 LOGGER.debug("Persisting file base on KARAF_CELLAR_CONTENT");
                 writeFile(storageFile, content);
+            } else {
+                LOGGER.debug("File content is null, don't save file now. Dictionary : {}", clusterDictionary);
             }
         } catch (Exception e) {
             LOGGER.error("CELLAR CONFIG: Issue when trying to persist configuration file", e);
