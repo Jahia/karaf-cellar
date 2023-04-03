@@ -211,7 +211,7 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                                     Dictionary localDictionary = localConfiguration.getProperties();
                                     localDictionary = filter(localDictionary);
                                     if (!clusterConfigurations.containsKey(pid)) {
-                                        LOGGER.debug("CELLAR CONFIG: creating configuration pid {} on the cluster: {}", pid, localDictionary);
+                                        LOGGER.debug("CELLAR CONFIG: creating configuration pid {} on the cluster: {}", pid, Collections.list(localDictionary.keys()));
                                         // update cluster configurations
                                         clusterConfigurations.put(pid, dictionaryToProperties(localDictionary));
                                         // send cluster event
