@@ -18,6 +18,9 @@ import org.apache.karaf.cellar.core.Group;
 import org.apache.karaf.cellar.core.control.SwitchStatus;
 import org.apache.karaf.cellar.core.event.EventProducer;
 import org.apache.karaf.cellar.core.event.EventType;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.InvalidSyntaxException;
+import org.osgi.framework.ServiceReference;
 import org.osgi.service.cm.Configuration;
 import org.osgi.service.cm.ConfigurationEvent;
 import org.osgi.service.cm.ConfigurationListener;
@@ -53,6 +56,19 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
         if (eventProducer.getSwitch().getStatus().equals(SwitchStatus.OFF)) {
             LOGGER.debug("CELLAR CONFIG: cluster event producer is OFF");
             return;
+        }
+
+        BundleContext bundleContext = event.getReference().getBundle().getBundleContext();
+        try {
+            Collection<ServiceReference<ConfigurationListener>> serviceReferences = bundleContext.getServiceReferences(ConfigurationListener.class, null);
+            for (ServiceReference<ConfigurationListener> serviceReference : serviceReferences) {
+                if (Arrays.asList((String[]) serviceReference.getProperty("objectClass")).contains("org.apache.felix.fileinstall.ArtifactInstaller")) {
+                    ConfigurationListener service = bundleContext.getService(serviceReference);
+                    service.configurationEvent(event);
+                }
+            }
+        } catch (InvalidSyntaxException e) {
+            // Not found
         }
 
         String pid = event.getPid();
