@@ -79,7 +79,7 @@
     <scm>
         <connection>scm:git:git@github.com:Jahia/karaf-cellar.git</connection>
         <developerConnection>scm:git:git@github.com:Jahia/karaf-cellar.git</developerConnection>
-        <url>scm:git:git@github.com:Jahia/karaf-cellar.git</url>
+        <url>https://github.com/Jahia/karaf-cellar</url>
         <tag>cellar-4.1.3-jahia-fixes</tag>
     </scm>
 
