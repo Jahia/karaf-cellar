@@ -23,6 +23,7 @@ public class ClusterConfigurationEvent extends Event {
 
 	private Integer type;
     private Node local;
+    private String oid;
 
     public ClusterConfigurationEvent(String id) {
         super(id);
@@ -44,12 +45,21 @@ public class ClusterConfigurationEvent extends Event {
         this.local = local;
     }
 
+    public String getOid() {
+        return oid;
+    }
+
+    public void setOid(String oid) {
+        this.oid = oid;
+    }
+
     @Override
 	public String toString() {
 		return "ClusterConfigurationEvent [type=" + type + ", id=" + id
 				+ ", sourceNode=" + sourceNode + ", sourceGroup=" + sourceGroup
 				+ ", destination=" + destination + ", force=" + force
-				+ ", postPublish=" + postPublish + "]";
+				+ ", postPublish=" + postPublish + ", oid=" + oid
+                + "]";
 	}
 
 }

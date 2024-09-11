@@ -76,12 +76,32 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
 
         if (isAllowed(event.getSourceGroup(), Constants.CATEGORY, pid, EventType.INBOUND)) {
             synchronized (clusterConfigurations) {
+                int tries = 3;
+                boolean configSync = false;
                 Dictionary clusterDictionary = clusterConfigurations.get(pid);
                 LOGGER.debug("Received event for configuration {} , cluster data : {}", pid, Collections.list(clusterDictionary.keys()));
-
+                while (!configSync && tries > 0) {
+                    if (event.getOid() != null && !event.getOid().equals(clusterDictionary.get(KARAF_CELLAR_OID))) {
+                        LOGGER.warn("CELLAR CONFIG: event {} is not in sync with the cluster configuration, waiting sync and retry...",
+                                event);
+                        tries--;
+                        try {
+                            this.wait(1000);
+                        } catch (InterruptedException ignored) {
+                        }
+                        clusterDictionary = clusterConfigurations.get(pid);
+                    } else {
+                        configSync = true;
+                    }
+                }
+                if (!configSync) {
+                    LOGGER.error("CELLAR CONFIG: event {} is not in sync with the cluster configuration, giving up...", event);
+                    return;
+                }
                 try {
                     // update the local configuration
                     Configuration localConfiguration = findLocalConfiguration(pid, clusterDictionary);
+
                     if (event.getType() != null && event.getType() == ConfigurationEvent.CM_DELETED) {
                         // delete the configuration
                         if (localConfiguration != null) {

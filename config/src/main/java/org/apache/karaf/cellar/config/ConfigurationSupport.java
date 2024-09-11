@@ -33,6 +33,7 @@ public class ConfigurationSupport extends CellarSupport {
     public static final String KARAF_CELLAR_FILENAME = "karaf.cellar.filename";
     public static final String KARAF_CELLAR_CONTENT = "karaf.cellar.content";
     public static final String KARAF_CELLAR_REMOVED = "karaf.cellar.removed";
+    public static final String KARAF_CELLAR_OID = "karaf.cellar.oid";
 
     protected File storage;
 
