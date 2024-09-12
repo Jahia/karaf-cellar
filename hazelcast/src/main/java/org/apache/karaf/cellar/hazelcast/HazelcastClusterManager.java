@@ -18,7 +18,9 @@ import com.hazelcast.core.IdGenerator;
 import com.hazelcast.core.Member;
 import org.apache.karaf.cellar.core.ClusterManager;
 import org.apache.karaf.cellar.core.Group;
+import org.apache.karaf.cellar.core.listener.ClusterListener;
 import org.apache.karaf.cellar.core.Node;
+import org.apache.karaf.cellar.core.listener.ClusterMapListener;
 import org.apache.karaf.cellar.core.utils.CombinedClassLoader;
 import org.osgi.service.cm.ConfigurationAdmin;
 
@@ -49,6 +51,18 @@ public class HazelcastClusterManager extends HazelcastInstanceAware implements C
     @Override
     public Map getMap(String mapName) {
         return instance.getReplicatedMap(mapName);
+    }
+
+    @Override
+    public void addMapListener(String mapName, ClusterMapListener listener) {
+        CellarMapListener cellarMapListener = new CellarMapListener(mapName, listener);
+        String id = instance.getReplicatedMap(mapName).addEntryListener(cellarMapListener);
+        cellarMapListener.setId(id);
+    }
+
+    @Override
+    public void removeMapListener(String mapName, String id) {
+        instance.getReplicatedMap(mapName).removeEntryListener(id);
     }
 
     /**

@@ -13,7 +13,6 @@
  */
 package org.apache.karaf.cellar.config.shell;
 
-import org.apache.karaf.cellar.config.ClusterConfigurationEvent;
 import org.apache.karaf.cellar.config.Constants;
 import org.apache.karaf.cellar.config.shell.completers.ClusterConfigCompleter;
 import org.apache.karaf.cellar.core.Configurations;
@@ -27,7 +26,6 @@ import org.apache.karaf.shell.api.action.Command;
 import org.apache.karaf.shell.api.action.Completion;
 import org.apache.karaf.shell.api.action.lifecycle.Reference;
 import org.apache.karaf.shell.api.action.lifecycle.Service;
-import org.osgi.service.cm.ConfigurationEvent;
 
 import java.util.Map;
 import java.util.Properties;
@@ -72,14 +70,6 @@ public class DeleteCommand extends ConfigCommandSupport {
         if (clusterConfigurations != null) {
             // update configurations in the cluster group
             clusterConfigurations.remove(pid);
-
-            // broadcast a cluster event
-            ClusterConfigurationEvent event = new ClusterConfigurationEvent(pid);
-            event.setSourceGroup(group);
-            event.setSourceNode(clusterManager.getNode());
-            event.setType(ConfigurationEvent.CM_DELETED);
-            eventProducer.produce(event);
-
         } else {
             System.out.println("Configuration distributed map not found for cluster group " + groupName);
         }

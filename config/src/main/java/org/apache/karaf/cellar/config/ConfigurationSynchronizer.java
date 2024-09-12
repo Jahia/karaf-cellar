@@ -214,24 +214,12 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                                         LOGGER.debug("CELLAR CONFIG: creating configuration pid {} on the cluster: {}", pid, Collections.list(localDictionary.keys()));
                                         // update cluster configurations
                                         clusterConfigurations.put(pid, dictionaryToProperties(localDictionary));
-                                        // send cluster event
-                                        ClusterConfigurationEvent event = new ClusterConfigurationEvent(pid);
-                                        event.setSourceGroup(group);
-                                        event.setSourceNode(clusterManager.getNode());
-                                        event.setLocal(clusterManager.getNode());
-                                        eventProducer.produce(event);
                                     } else {
                                         Dictionary clusterDictionary = clusterConfigurations.get(pid);
                                         if (!equals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary)) {
                                             LOGGER.debug("CELLAR CONFIG: updating configuration pid {} on the cluster", pid);
                                             // update cluster configurations
                                             clusterConfigurations.put(pid, dictionaryToProperties(localDictionary));
-                                            // send cluster event
-                                            ClusterConfigurationEvent event = new ClusterConfigurationEvent(pid);
-                                            event.setSourceGroup(group);
-                                            event.setLocal(clusterManager.getNode());
-                                            event.setSourceNode(clusterManager.getNode());
-                                            eventProducer.produce(event);
                                         }
                                     }
                                 }

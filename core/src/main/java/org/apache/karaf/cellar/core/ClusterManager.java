@@ -13,6 +13,8 @@
  */
 package org.apache.karaf.cellar.core;
 
+import org.apache.karaf.cellar.core.listener.ClusterMapListener;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +32,10 @@ public interface ClusterManager {
      * @return the map in the cluster.
      */
     public Map getMap(String mapName);
+
+    public void addMapListener(String mapName, ClusterMapListener listener);
+
+    public void removeMapListener(String mapName, String id);
 
     /**
      * Get a list in the cluster.

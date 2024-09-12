@@ -172,12 +172,36 @@ public class CellarSupport {
      * @param type the event type (inbound, outbound).
      */
     public Boolean isAllowed(Group group, String category, String event, EventType type) {
-        Set<String> whiteList = getListEntries(Configurations.WHITELIST, group, category, type);
-        Set<String> blackList = getListEntries(Configurations.BLACKLIST, group, category, type);
+        return internalIsAllowed(group.getName(), category, event, type);
+    }
+
+    /**
+     * Check if a resource is allowed for a type of cluster event.
+     *
+     * @param groupName the cluster group name.
+     * @param category the resource category name.
+     * @param event the resource name.
+     * @param type the event type (inbound, outbound).
+     */
+    public Boolean isAllowed(String groupName, String category, String event, EventType type) {
+        return internalIsAllowed(groupName, category, event, type);
+    }
+
+    /**
+     * Check if a resource is allowed for a type of cluster event.
+     *
+     * @param groupName the cluster group name.
+     * @param category the resource category name.
+     * @param event the resource name.
+     * @param type the event type (inbound, outbound).
+     */
+    private Boolean internalIsAllowed(String groupName, String category, String event, EventType type) {
+        Set<String> whiteList = getListEntries(Configurations.WHITELIST, groupName, category, type);
+        Set<String> blackList = getListEntries(Configurations.BLACKLIST, groupName, category, type);
 
         if (blackList == null || whiteList == null) {
             // If one list is missing, we probably have a configuration issue - do not synchronize anything
-            LOGGER.warn("No whitelist/blacklist found for " + group.getName() + ", check your configuration !");
+            LOGGER.warn("No whitelist/blacklist found for " + groupName + ", check your configuration !");
             return false;
         }
 

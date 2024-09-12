@@ -13,20 +13,17 @@
  */
 package org.apache.karaf.cellar.config.management.internal;
 
-import org.apache.karaf.cellar.config.ClusterConfigurationEvent;
 import org.apache.karaf.cellar.config.Constants;
+import org.apache.karaf.cellar.config.management.CellarConfigMBean;
 import org.apache.karaf.cellar.core.*;
 import org.apache.karaf.cellar.core.control.SwitchStatus;
 import org.apache.karaf.cellar.core.event.EventProducer;
 import org.apache.karaf.cellar.core.event.EventType;
-import org.apache.karaf.cellar.config.management.CellarConfigMBean;
 import org.osgi.service.cm.Configuration;
 import org.osgi.service.cm.ConfigurationAdmin;
-import org.osgi.service.cm.ConfigurationEvent;
 
 import javax.management.NotCompliantMBeanException;
 import javax.management.StandardMBean;
-import javax.management.openmbean.*;
 import java.util.*;
 
 /**
@@ -87,13 +84,6 @@ public class CellarConfigMBeanImpl extends StandardMBean implements CellarConfig
         if (clusterConfigurations != null) {
             // update the cluster group
             Properties properties = clusterConfigurations.remove(pid);
-
-            // broadcast the cluster event
-            ClusterConfigurationEvent event = new ClusterConfigurationEvent(pid);
-            event.setSourceGroup(group);
-            event.setSourceNode(clusterManager.getNode());
-            event.setType(ConfigurationEvent.CM_DELETED);
-            eventProducer.produce(event);
         } else {
             throw new IllegalArgumentException("No configuration found in cluster group " + groupName);
         }
@@ -147,12 +137,6 @@ public class CellarConfigMBeanImpl extends StandardMBean implements CellarConfig
             }
             clusterProperties.put(key, value);
             clusterConfigurations.put(pid, clusterProperties);
-
-            // broadcast the cluster event
-            ClusterConfigurationEvent event = new ClusterConfigurationEvent(pid);
-            event.setSourceGroup(group);
-            event.setSourceNode(clusterManager.getNode());
-            eventProducer.produce(event);
         } else {
             throw new IllegalArgumentException("No configuration found in cluster group " + groupName);
         }
@@ -196,12 +180,6 @@ public class CellarConfigMBeanImpl extends StandardMBean implements CellarConfig
                 throw new IllegalStateException("Append failed: current value is not a String");
             }
             clusterConfigurations.put(pid, clusterProperties);
-
-            // broadcast the cluster event
-            ClusterConfigurationEvent event = new ClusterConfigurationEvent(pid);
-            event.setSourceGroup(group);
-            event.setSourceNode(clusterManager.getNode());
-            eventProducer.produce(event);
         } else {
             throw new IllegalArgumentException("No configuration found in cluster group " + groupName);
         }
@@ -236,11 +214,6 @@ public class CellarConfigMBeanImpl extends StandardMBean implements CellarConfig
             if (clusterDictionary != null) {
                 clusterDictionary.remove(key);
                 clusterConfigurations.put(pid, clusterDictionary);
-                // broadcast the cluster event
-                ClusterConfigurationEvent event = new ClusterConfigurationEvent(pid);
-                event.setSourceGroup(group);
-                event.setSourceNode(clusterManager.getNode());
-                eventProducer.produce(event);
             }
         } else {
             throw new IllegalArgumentException("No configuration found in cluster group " + groupName);

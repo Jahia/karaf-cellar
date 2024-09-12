@@ -99,13 +99,6 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
                                         LOGGER.debug("Marking config {} for deletion", matchingPid);
                                         clusterConfigurations.put(matchingPid, getDeletedConfigurationMarker(clusterConfigurations.get(matchingPid)));
                                     }
-                                    // send the cluster event
-                                    ClusterConfigurationEvent clusterConfigurationEvent = new ClusterConfigurationEvent(pid);
-                                    clusterConfigurationEvent.setType(event.getType());
-                                    clusterConfigurationEvent.setSourceNode(clusterManager.getNode());
-                                    clusterConfigurationEvent.setSourceGroup(group);
-                                    clusterConfigurationEvent.setLocal(clusterManager.getNode());
-                                    eventProducer.produce(clusterConfigurationEvent);
                                 }
                             } else {
 
@@ -119,12 +112,6 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
                                     // update the configurations in the cluster group
                                     LOGGER.debug("Storing configuration {} in cluster {}", pid, Collections.list(localDictionary.keys()));
                                     clusterConfigurations.put(pid, dictionaryToProperties(localDictionary));
-                                    // send the cluster event
-                                    ClusterConfigurationEvent clusterConfigurationEvent = new ClusterConfigurationEvent(pid);
-                                    clusterConfigurationEvent.setSourceGroup(group);
-                                    clusterConfigurationEvent.setSourceNode(clusterManager.getNode());
-                                    clusterConfigurationEvent.setLocal(clusterManager.getNode());
-                                    eventProducer.produce(clusterConfigurationEvent);
                                 }
                             }
                         } catch (Exception e) {

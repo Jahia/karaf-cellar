@@ -13,7 +13,6 @@
  */
 package org.apache.karaf.cellar.config.shell;
 
-import org.apache.karaf.cellar.config.ClusterConfigurationEvent;
 import org.apache.karaf.cellar.config.Constants;
 import org.apache.karaf.cellar.config.shell.completers.ClusterConfigCompleter;
 import org.apache.karaf.cellar.core.Configurations;
@@ -82,12 +81,6 @@ public class PropSetCommand extends ConfigCommandSupport {
             }
             properties.put(key, value);
             clusterConfigurations.put(pid, properties);
-
-            // broadcast the cluster event
-            ClusterConfigurationEvent event = new ClusterConfigurationEvent(pid);
-            event.setSourceGroup(group);
-            event.setSourceNode(clusterManager.getNode());
-            eventProducer.produce(event);
         } else {
             System.out.println("No configuration found in cluster group " + groupName);
         }

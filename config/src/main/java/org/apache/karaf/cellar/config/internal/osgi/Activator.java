@@ -13,7 +13,7 @@
  */
 package org.apache.karaf.cellar.config.internal.osgi;
 
-import org.apache.karaf.cellar.config.ConfigurationEventHandler;
+import org.apache.karaf.cellar.config.ClusterConfigurationChangeHandler;
 import org.apache.karaf.cellar.config.ConfigurationSynchronizer;
 import org.apache.karaf.cellar.config.LocalConfigurationListener;
 import org.apache.karaf.cellar.config.management.CellarConfigMBean;
@@ -23,6 +23,7 @@ import org.apache.karaf.cellar.core.GroupManager;
 import org.apache.karaf.cellar.core.Synchronizer;
 import org.apache.karaf.cellar.core.event.EventHandler;
 import org.apache.karaf.cellar.core.event.EventProducer;
+import org.apache.karaf.cellar.core.listener.ClusterListener;
 import org.apache.karaf.util.tracker.BaseActivator;
 import org.apache.karaf.util.tracker.annotation.Managed;
 import org.apache.karaf.util.tracker.annotation.ProvideService;
@@ -47,6 +48,7 @@ import java.util.Hashtable;
         },
         provides = {
                 @ProvideService(ConfigurationListener.class),
+                @ProvideService(ClusterListener.class),
                 @ProvideService(Synchronizer.class),
                 @ProvideService(EventHandler.class),
                 @ProvideService(CellarConfigMBean.class)
@@ -58,8 +60,8 @@ public class Activator extends BaseActivator implements ManagedService {
     private final static Logger LOGGER = LoggerFactory.getLogger(Activator.class);
 
     private LocalConfigurationListener localConfigurationListener;
+    private ClusterConfigurationChangeHandler clusterConfigurationHandler;
     private ConfigurationSynchronizer configurationSynchronizer;
-    private ConfigurationEventHandler configurationEventHandler;
     private ServiceRegistration cellarConfigMBeanRegistration;
 
     @Override
@@ -80,16 +82,14 @@ public class Activator extends BaseActivator implements ManagedService {
 
         File storage = new File(getString("storage", System.getProperty("karaf.etc")));
 
-        LOGGER.debug("CELLAR CONFIG: init event handler");
-        configurationEventHandler = new ConfigurationEventHandler();
-        configurationEventHandler.setConfigurationAdmin(configurationAdmin);
-        configurationEventHandler.setGroupManager(groupManager);
-        configurationEventHandler.setClusterManager(clusterManager);
-        configurationEventHandler.setStorage(storage);
-        configurationEventHandler.init();
-        Hashtable props = new Hashtable();
-        props.put("managed", "true");
-        register(EventHandler.class, configurationEventHandler, props);
+        LOGGER.debug("CELLAR CONFIG: init cluster handler");
+        clusterConfigurationHandler = new ClusterConfigurationChangeHandler();
+        clusterConfigurationHandler.setClusterManager(clusterManager);
+        clusterConfigurationHandler.setGroupManager(groupManager);
+        clusterConfigurationHandler.setConfigurationAdmin(configurationAdmin);
+        clusterConfigurationHandler.setStorage(storage);
+        clusterConfigurationHandler.init();
+        register(ClusterListener.class, clusterConfigurationHandler);
 
         LOGGER.debug("CELLAR CONFIG: init local listener");
         localConfigurationListener = new LocalConfigurationListener();
@@ -109,7 +109,7 @@ public class Activator extends BaseActivator implements ManagedService {
         configurationSynchronizer.setEventProducer(eventProducer);
         configurationSynchronizer.setStorage(storage);
         configurationSynchronizer.init(bundleContext);
-        props = new Hashtable();
+        Hashtable props = new Hashtable();
         props.put("resource", "config");
         register(Synchronizer.class, configurationSynchronizer, props);
 
@@ -128,6 +128,10 @@ public class Activator extends BaseActivator implements ManagedService {
     public void doStop() {
         super.doStop();
 
+        if (clusterConfigurationHandler != null) {
+            clusterConfigurationHandler.destroy();
+            clusterConfigurationHandler = null;
+        }
         if (cellarConfigMBeanRegistration != null) {
             cellarConfigMBeanRegistration.unregister();
             cellarConfigMBeanRegistration = null;
@@ -139,10 +143,6 @@ public class Activator extends BaseActivator implements ManagedService {
         if (localConfigurationListener != null) {
             localConfigurationListener.destroy();
             localConfigurationListener = null;
-        }
-        if (configurationEventHandler != null) {
-            configurationEventHandler.destroy();
-            configurationEventHandler = null;
         }
     }
 
