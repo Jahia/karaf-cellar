@@ -82,7 +82,7 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
                 LOGGER.debug("Received event for configuration {} , cluster data : {}", pid, Collections.list(clusterDictionary.keys()));
                 while (!configSync && tries > 0) {
                     if (event.getOid() != null && !event.getOid().equals(clusterDictionary.get(KARAF_CELLAR_OID))) {
-                        LOGGER.warn("CELLAR CONFIG: event oid {} is not in sync with the cluster configuration oid {}, waiting sync and retry...",
+                        LOGGER.info("CELLAR CONFIG: event oid {} is not in sync with the cluster configuration oid {}, waiting for hazelcast map sync and retry...",
                                 event.getOid(), clusterDictionary.get(KARAF_CELLAR_OID));
                         tries--;
                         try {
@@ -95,7 +95,7 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
                     }
                 }
                 if (!configSync) {
-                    LOGGER.error("CELLAR CONFIG: event {} is not in sync with the cluster configuration, giving up...", event);
+                    LOGGER.error("CELLAR CONFIG: event oid {} is not in sync with the cluster configuration, this will let that node configuration inconsistent, giving up retry. Perform a manual configuration consistency check after that !!", event);
                     return;
                 }
                 try {
