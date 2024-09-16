@@ -41,6 +41,8 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
 
     private final Switch eventSwitch = new BasicSwitch(SWITCH_ID);
 
+    private static final Object monitor = new Object();
+
     @Override
     public void handle(ClusterConfigurationEvent event) {
         // check if the handler is ON
@@ -69,34 +71,33 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
 
         Group group = event.getSourceGroup();
         String groupName = group.getName();
-
-        Map<String, Properties> clusterConfigurations = clusterManager.getMap(Constants.CONFIGURATION_MAP + Configurations.SEPARATOR + groupName);
-
         String pid = event.getId();
 
         if (isAllowed(event.getSourceGroup(), Constants.CATEGORY, pid, EventType.INBOUND)) {
-            synchronized (clusterConfigurations) {
-                int tries = 3;
+            synchronized (monitor) {
+                int tries = 5;
                 boolean configSync = false;
+                Map<String, Properties> clusterConfigurations = clusterManager.getMap(Constants.CONFIGURATION_MAP + Configurations.SEPARATOR + groupName);
                 Dictionary clusterDictionary = clusterConfigurations.get(pid);
                 LOGGER.debug("Received event for configuration {} , cluster data : {}", pid, Collections.list(clusterDictionary.keys()));
                 while (!configSync && tries > 0) {
-                    if (event.getOid() != null && !event.getOid().equals(clusterDictionary.get(KARAF_CELLAR_OID))) {
-                        LOGGER.info("CELLAR CONFIG: event oid {} is not in sync with the cluster configuration oid {}, waiting for hazelcast map sync and retry...",
-                                event.getOid(), clusterDictionary.get(KARAF_CELLAR_OID));
+                    if (event.getIntegrity() != null && !event.getIntegrity().equals(hash((Properties)clusterDictionary))) {
+                        LOGGER.info("CELLAR CONFIG: event integrity {} is not in sync with the cluster configuration, "
+                                + "waiting for hazelcast map sync and retry...", event.getIntegrity());
                         tries--;
                         try {
-                            Thread.sleep(1000);
+                            Thread.sleep(100);
                         } catch (InterruptedException ignored) {
                         }
+                        clusterConfigurations = clusterManager.getMap(Constants.CONFIGURATION_MAP + Configurations.SEPARATOR + groupName);
                         clusterDictionary = clusterConfigurations.get(pid);
                     } else {
                         configSync = true;
                     }
                 }
                 if (!configSync) {
-                    LOGGER.error("CELLAR CONFIG: event oid {} is not in sync with the cluster configuration, this will let that node configuration inconsistent, giving up retry. Perform a manual configuration consistency check after that !!", event);
-                    return;
+                    LOGGER.error("CELLAR CONFIG: event {} is not in sync with the cluster configuration, this may let that node configuration "
+                            + "inconsistent, giving up retry. Perform a manual configuration consistency check after that !!", event);
                 }
                 try {
                     // update the local configuration

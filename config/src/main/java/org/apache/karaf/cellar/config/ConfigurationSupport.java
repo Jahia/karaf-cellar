@@ -22,6 +22,8 @@ import org.osgi.service.cm.ConfigurationAdmin;
 import java.io.*;
 import java.net.URI;
 import java.net.URL;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
 /**
@@ -33,7 +35,6 @@ public class ConfigurationSupport extends CellarSupport {
     public static final String KARAF_CELLAR_FILENAME = "karaf.cellar.filename";
     public static final String KARAF_CELLAR_CONTENT = "karaf.cellar.content";
     public static final String KARAF_CELLAR_REMOVED = "karaf.cellar.removed";
-    public static final String KARAF_CELLAR_OID = "karaf.cellar.oid";
 
     protected File storage;
 
@@ -55,6 +56,28 @@ public class ConfigurationSupport extends CellarSupport {
             }
         }
         return properties;
+    }
+
+    /**
+     * Read a {@code Properties} and generate a hash of its keys and values.
+     *
+     * @param properties the source properties.
+     * @return the generated hashcode.
+     */
+    public static String hash(Properties properties) {
+        try {
+            MessageDigest hash = MessageDigest.getInstance("SHA-1");
+            hash.reset();
+            List<String> keys = new ArrayList(properties.stringPropertyNames());
+            Collections.sort(keys);
+            for (String key : keys) {
+                hash.update(key.getBytes("UTF-8"));
+                hash.update(properties.getProperty(key).getBytes("UTF-8"));
+            }
+            return Base64.getEncoder().encodeToString(hash.digest());
+        } catch(NoSuchAlgorithmException | UnsupportedEncodingException e) {
+            return "error";
+        }
     }
 
     /**

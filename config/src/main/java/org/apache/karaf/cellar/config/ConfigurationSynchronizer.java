@@ -200,7 +200,6 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
             try {
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
                 Configuration[] localConfigurations;
-                String oid = UUID.randomUUID().toString();
                 try {
                     localConfigurations = configurationAdmin.listConfigurations(null);
                     // push local configurations to the cluster
@@ -215,14 +214,13 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                                     LOGGER.debug("CELLAR CONFIG: creating configuration pid {} on the cluster: {}", pid, Collections.list(localDictionary.keys()));
                                     // update cluster configurations
                                     Properties props = dictionaryToProperties(localDictionary);
-                                    props.put(KARAF_CELLAR_OID, oid);
                                     clusterConfigurations.put(pid, props);
                                     // send cluster event
                                     ClusterConfigurationEvent event = new ClusterConfigurationEvent(pid);
                                     event.setSourceGroup(group);
                                     event.setSourceNode(clusterManager.getNode());
                                     event.setLocal(clusterManager.getNode());
-                                    event.setOid(oid);
+                                    event.setIntegrity(hash(props));
                                     eventProducer.produce(event);
                                 } else {
                                     Dictionary clusterDictionary = clusterConfigurations.get(pid);
@@ -230,14 +228,13 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                                         LOGGER.debug("CELLAR CONFIG: updating configuration pid {} on the cluster", pid);
                                         // update cluster configurations
                                         Properties props = dictionaryToProperties(localDictionary);
-                                        props.put(KARAF_CELLAR_OID, oid);
                                         clusterConfigurations.put(pid, props);
                                         // send cluster event
                                         ClusterConfigurationEvent event = new ClusterConfigurationEvent(pid);
                                         event.setSourceGroup(group);
                                         event.setLocal(clusterManager.getNode());
                                         event.setSourceNode(clusterManager.getNode());
-                                        event.setOid(oid);
+                                        event.setIntegrity(hash(props));
                                         eventProducer.produce(event);
                                     }
                                 }
