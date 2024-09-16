@@ -216,7 +216,7 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                                     // update cluster configurations
                                     Properties props = dictionaryToProperties(localDictionary);
                                     props.put(KARAF_CELLAR_OID, oid);
-                                    clusterConfigurations.put(pid, dictionaryToProperties(localDictionary));
+                                    clusterConfigurations.put(pid, props);
                                     // send cluster event
                                     ClusterConfigurationEvent event = new ClusterConfigurationEvent(pid);
                                     event.setSourceGroup(group);
@@ -231,7 +231,7 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                                         // update cluster configurations
                                         Properties props = dictionaryToProperties(localDictionary);
                                         props.put(KARAF_CELLAR_OID, oid);
-                                        clusterConfigurations.put(pid, dictionaryToProperties(localDictionary));
+                                        clusterConfigurations.put(pid, props);
                                         // send cluster event
                                         ClusterConfigurationEvent event = new ClusterConfigurationEvent(pid);
                                         event.setSourceGroup(group);

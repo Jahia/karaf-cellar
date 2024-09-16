@@ -100,8 +100,7 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
                                         LOGGER.debug("Marking config {} for deletion", matchingPid);
                                         Properties props = getDeletedConfigurationMarker(clusterConfigurations.get(matchingPid));
                                         props.put(KARAF_CELLAR_OID, oid);
-                                        clusterConfigurations.put(matchingPid,
-                                                getDeletedConfigurationMarker(clusterConfigurations.get(matchingPid)));
+                                        clusterConfigurations.put(matchingPid, props);
                                     }
                                     // send the cluster event
                                     ClusterConfigurationEvent clusterConfigurationEvent = new ClusterConfigurationEvent(pid);
@@ -123,7 +122,7 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
                                     // update the configurations in the cluster group
                                     Properties props = dictionaryToProperties(localDictionary);
                                     props.put(KARAF_CELLAR_OID, oid);
-                                    clusterConfigurations.put(pid, dictionaryToProperties(localDictionary));
+                                    clusterConfigurations.put(pid, props);
                                     // send the cluster event
                                     ClusterConfigurationEvent clusterConfigurationEvent = new ClusterConfigurationEvent(pid);
                                     clusterConfigurationEvent.setSourceGroup(group);
