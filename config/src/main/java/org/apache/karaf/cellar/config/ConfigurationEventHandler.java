@@ -82,8 +82,8 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
                 LOGGER.debug("Received event for configuration {} , cluster data : {}", pid, Collections.list(clusterDictionary.keys()));
                 while (!configSync && tries > 0) {
                     if (event.getIntegrity() != null && !event.getIntegrity().equals(hash((Properties)clusterDictionary))) {
-                        LOGGER.info("CELLAR CONFIG: event integrity {} is not in sync with the cluster configuration, "
-                                + "waiting for hazelcast map sync and retry...", event.getIntegrity());
+                        LOGGER.debug("CELLAR CONFIG: event integrity {} is not sync with the cluster configuration, "
+                                + "waiting 100ms for hazelcast map sync and retry...", event.getIntegrity());
                         tries--;
                         try {
                             Thread.sleep(100);
@@ -96,8 +96,8 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
                     }
                 }
                 if (!configSync) {
-                    LOGGER.error("CELLAR CONFIG: event {} is not in sync with the cluster configuration, this may let that node configuration "
-                            + "inconsistent, giving up retry. Perform a manual configuration consistency check after that !!", event);
+                    LOGGER.error("CELLAR CONFIG: event {} is not sync with the cluster configuration, this may let that node configuration "
+                            + "inconsistent, giving up after 10 retries. Perform a manual configuration consistency check after that !!", event);
                 }
                 try {
                     // update the local configuration
