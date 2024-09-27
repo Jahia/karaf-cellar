@@ -81,7 +81,6 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
             for (Group group : groups) {
                 // check if the pid is allowed for outbound.
                 if (isAllowed(group, Constants.CATEGORY, pid, EventType.OUTBOUND)) {
-
                     Map<String, Properties> clusterConfigurations = clusterManager.getMap(Constants.CONFIGURATION_MAP + Configurations.SEPARATOR + group.getName());
                     synchronized (clusterConfigurations) {
                         try {
@@ -90,7 +89,8 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
                                     String filename = (String) clusterConfigurations.get(pid).get(KARAF_CELLAR_FILENAME);
                                     List<String> matchingPids = new ArrayList<String>();
                                     for (Map.Entry<String, Properties> entry : clusterConfigurations.entrySet()) {
-                                        if (filename.equals(entry.getValue().get(KARAF_CELLAR_FILENAME)) && entry.getValue().get(KARAF_CELLAR_REMOVED) == null) {
+                                        if (filename.equals(entry.getValue().get(KARAF_CELLAR_FILENAME))
+                                                && entry.getValue().get(KARAF_CELLAR_REMOVED) == null) {
                                             matchingPids.add(entry.getKey());
                                         }
                                     }
@@ -108,7 +108,6 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
                                     eventProducer.produce(clusterConfigurationEvent);
                                 }
                             } else {
-
                                 Configuration conf = configurationAdmin.getConfiguration(pid, null);
                                 Dictionary localDictionary = conf.getProperties();
                                 localDictionary = filter(localDictionary);
@@ -118,17 +117,20 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
                                 if (!equals(localDictionary, distributedDictionary) && canDistributeConfig(localDictionary)) {
                                     // update the configurations in the cluster group
                                     LOGGER.debug("Storing configuration {} in cluster {}", pid, Collections.list(localDictionary.keys()));
-                                    clusterConfigurations.put(pid, dictionaryToProperties(localDictionary));
+                                    Properties props = dictionaryToProperties(localDictionary);
+                                    clusterConfigurations.put(pid, props);
                                     // send the cluster event
                                     ClusterConfigurationEvent clusterConfigurationEvent = new ClusterConfigurationEvent(pid);
                                     clusterConfigurationEvent.setSourceGroup(group);
                                     clusterConfigurationEvent.setSourceNode(clusterManager.getNode());
                                     clusterConfigurationEvent.setLocal(clusterManager.getNode());
+                                    clusterConfigurationEvent.setIntegrity(hash(props));
                                     eventProducer.produce(clusterConfigurationEvent);
                                 }
                             }
                         } catch (Exception e) {
-                            LOGGER.error("CELLAR CONFIG: failed to update configuration with PID {} in the cluster group {}", pid, group.getName(), e);
+                            LOGGER.error("CELLAR CONFIG: failed to update configuration with PID {} in the cluster group {}", pid,
+                                    group.getName(), e);
                         }
                     }
                 } else LOGGER.trace("CELLAR CONFIG: configuration with PID {} is marked BLOCKED OUTBOUND for cluster group {}", pid, group.getName());

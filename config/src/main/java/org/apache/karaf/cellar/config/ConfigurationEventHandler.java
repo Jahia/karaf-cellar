@@ -38,8 +38,14 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
     private static final transient Logger LOGGER = LoggerFactory.getLogger(ConfigurationEventHandler.class);
 
     public static final String SWITCH_ID = "org.apache.karaf.cellar.configuration.handler";
+    public static final int INTEGRITY_TRY_COUNT_DEFAULT = 5;
+    public static final String INTEGRITY_TRY_COUNT_PROP = "config.integrityCheck.retryCount";
+    public static final int INTEGRITY_TRY_INTERVAL_DEFAULT = 100;
+    public static final String INTEGRITY_TRY_INTERVAL_PROP = "config.integrityCheck.retryIntervalMS";
 
     private final Switch eventSwitch = new BasicSwitch(SWITCH_ID);
+
+    private static final Object monitor = new Object();
 
     @Override
     public void handle(ClusterConfigurationEvent event) {
@@ -69,23 +75,58 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
 
         Group group = event.getSourceGroup();
         String groupName = group.getName();
-
-        Map<String, Properties> clusterConfigurations = clusterManager.getMap(Constants.CONFIGURATION_MAP + Configurations.SEPARATOR + groupName);
-
         String pid = event.getId();
 
         if (isAllowed(event.getSourceGroup(), Constants.CATEGORY, pid, EventType.INBOUND)) {
-            synchronized (clusterConfigurations) {
+            synchronized (monitor) {
+                Map<String, Properties> clusterConfigurations = clusterManager.getMap(Constants.CONFIGURATION_MAP + Configurations.SEPARATOR + groupName);
                 Dictionary clusterDictionary = clusterConfigurations.get(pid);
-                LOGGER.debug("Received event for configuration {} , cluster data : {}", pid, Collections.list(clusterDictionary.keys()));
+                LOGGER.debug("CELLAR CONFIG: Received event for configuration {}, cluster data : {}", pid, Collections.list(clusterDictionary.keys()));
+
+                // Integrity check and retry if needed
+                boolean clusterConfigIntegrityCheck = integrityCheck(event.getIntegrity(), clusterDictionary);
+                if (!clusterConfigIntegrityCheck) {
+                    int tries = getIntegrityTryCount();
+                    int interval = getIntegrityTryInterval();
+
+                    LOGGER.warn("CELLAR CONFIG: Integrity check failed between received config update event and cluster configuration for pid: {}, " +
+                            "will retry {} times with {}ms interval", pid, tries, interval);
+                    while (!clusterConfigIntegrityCheck && tries > 0) {
+                        // Wait for a while before retrying
+                        try {
+                            Thread.sleep(interval);
+                        } catch (InterruptedException ignored) {
+                        }
+
+                        // Reload cluster configuration
+                        clusterConfigurations = clusterManager.getMap(Constants.CONFIGURATION_MAP + Configurations.SEPARATOR + groupName);
+                        clusterDictionary = clusterConfigurations.get(pid);
+
+                        // Check integrity again
+                        if (!integrityCheck(event.getIntegrity(), clusterDictionary)) {
+                            tries--;
+                            if (tries > 0) {
+                                LOGGER.warn("CELLAR CONFIG: Integrity check still incorrect for pid: {}, " +
+                                        "will retry in {}ms, remaining tries: {}", pid, interval, tries);
+                            } else {
+                                LOGGER.error("CELLAR CONFIG: Integrity check still incorrect for pid: {}, giving up after retries limit reached, " +
+                                        "this may let that node configuration inconsistent. It's recommended to perform a manual cluster configuration sync !", pid);
+                            }
+                        } else {
+                            clusterConfigIntegrityCheck = true;
+                            LOGGER.info("CELLAR CONFIG: Integrity check success for pid: {} after retries", pid);
+                        }
+                    }
+                }
 
                 try {
                     // update the local configuration
                     Configuration localConfiguration = findLocalConfiguration(pid, clusterDictionary);
+
                     if (event.getType() != null && event.getType() == ConfigurationEvent.CM_DELETED) {
                         // delete the configuration
                         if (localConfiguration != null) {
-                            LOGGER.debug("Local config found, deleting it - pid = {}, from {}", localConfiguration.getPid(), pid);
+                            LOGGER.debug("CELLAR CONFIG: Local config found, deleting it - pid = {}, from {}", localConfiguration.getPid(), pid);
                             deleteConfiguration(localConfiguration);
                         }
                     } else {
@@ -93,9 +134,9 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
                             if (localConfiguration == null) {
                                 // Create new configuration
                                 localConfiguration = createLocalConfiguration(pid, clusterDictionary);
-                                LOGGER.debug("Local config created - local pid: {}, from {} ", localConfiguration.getPid(), pid);
+                                LOGGER.debug("CELLAR CONFIG: Local config created - local pid: {}, from {} ", localConfiguration.getPid(), pid);
                             } else {
-                                LOGGER.debug("Local config found, updating - pid = {}, from {}", localConfiguration.getPid(), pid);
+                                LOGGER.debug("CELLAR CONFIG: Local config found, updating - pid = {}, from {}", localConfiguration.getPid(), pid);
                             }
                             Dictionary localDictionary = localConfiguration.getProperties();
                             if (localDictionary == null) {
@@ -107,7 +148,7 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
                                 Dictionary convertedDictionary = convertPropertiesFromCluster(clusterDictionary);
                                 if (!localConfiguration.getPid().equals(pid)) {
                                     Properties p = dictionaryToProperties(filter(convertedDictionary));
-                                    LOGGER.debug("Storing factory configuration local pid: {}, from {} : {}", localConfiguration.getProperties(), pid, Collections.list(localDictionary.keys()));
+                                    LOGGER.debug("CELLAR CONFIG: Storing factory configuration local pid: {}, from {} : {}", localConfiguration.getProperties(), pid, Collections.list(localDictionary.keys()));
                                     clusterConfigurations.put(localConfiguration.getPid(), p);
                                 }
                                 localConfiguration.update(convertedDictionary);
@@ -127,6 +168,42 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
 
     public void destroy() {
         // nothing to do
+    }
+
+    private boolean integrityCheck(String integrityHash, Dictionary dictionary) {
+        // In case of deleted conf event, integrityHash is null, we consider it as correct
+        return integrityHash == null ||
+                (dictionary != null && integrityHash.equals(hash((Properties) dictionary)));
+    }
+
+    private int getIntegrityTryCount() {
+        try {
+            Configuration configuration = configurationAdmin.getConfiguration(Configurations.NODE, null);
+            if (configuration != null) {
+                String value = (String) configuration.getProperties().get(INTEGRITY_TRY_COUNT_PROP);
+                if (value != null) {
+                    return Integer.parseInt(value);
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.error("CELLAR CONFIG: can't get integrity try count", e);
+        }
+        return INTEGRITY_TRY_COUNT_DEFAULT;
+    }
+
+    private int getIntegrityTryInterval() {
+        try {
+            Configuration configuration = configurationAdmin.getConfiguration(Configurations.NODE, null);
+            if (configuration != null) {
+                String value = (String) configuration.getProperties().get(INTEGRITY_TRY_INTERVAL_PROP);
+                if (value != null) {
+                    return Integer.parseInt(value);
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.error("CELLAR CONFIG: can't get integrity try interval", e);
+        }
+        return INTEGRITY_TRY_INTERVAL_DEFAULT;
     }
 
     /**
