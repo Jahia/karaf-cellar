@@ -85,12 +85,12 @@
 
     <distributionManagement>
         <repository>
-            <id>jahia-internal-releases</id>
+            <id>thirdparty-releases</id>
             <name>3rd Party Releases</name>
             <url>https://devtools.jahia.com/nexus/content/repositories/thirdparty-releases</url>
         </repository>
         <snapshotRepository>
-            <id>jahia-internal-snapshots</id>
+            <id>thirdparty-snapshots</id>
             <name>3rd Party Snapshots</name>
             <url>https://devtools.jahia.com/nexus/content/repositories/thirdparty-snapshots</url>
         </snapshotRepository>
