@@ -22,7 +22,14 @@ jobs:
       - uses: webfactory/ssh-agent@v0.7.0
         with:
           ssh-private-key: ${{ secrets.GH_SSH_PRIVATE_KEY_JAHIACI }}
-
+      - name: Delete auto created github tag ${{ github.event.release.tag_name }}
+        shell: bash
+        run: |
+          git config user.email 'jahia-ci@jahia.com'
+          git config user.name 'Jahia CI'
+          git fetch --all
+          git tag --delete ${{ github.event.release.tag_name }}
+          git push origin :refs/tags/${{ github.event.release.tag_name }}
       - uses: actions/cache@v3
         with:
           path: ~/.m2/repository
@@ -40,11 +47,6 @@ jobs:
         id: extract_branch
       - name: Release with Maven
         run: |
-          echo "Check that we are on a jahia branch"
-          if [[ ! ${{ steps.extract_branch.outputs.branch }} =~ ^.*jahia.*$ ]]; then
-            echo "Not on a jahia branch, exiting"
-            exit 0
-          fi
           TAG_VERSION="${{ github.event.release.tag_name }}" # e.g. cellar-2.20.12-jahia1
           FINAL_RELEASE_VERSION=${TAG_VERSION:7} # extract 2.20.12-jahia1 from the tag
           REVISION=$(echo $FINAL_RELEASE_VERSION  | grep -Eo '[0-9]+$') # extract 1 from 2.20.12-jahia1
