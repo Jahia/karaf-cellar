@@ -65,9 +65,7 @@ jobs:
           [[ -z "$NEXT_REVISION" ]] && { echo "next revision is empty" ; exit 0; }
           [[ -z "$NEXT_DEVELOPMENT_VERSION" ]] && { echo "next development version is empty" ; exit 0; }
           echo "Prepare release version $FINAL_RELEASE_VERSION with tag $TAG_VERSION"
-          mvn -ntp -B -X -s .github/maven.settings.xml -DdryRun=true -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true -DskipLocalStaging=true \
-          -Dtag=$TAG_VERSION -DreleaseVersion=$FINAL_RELEASE_VERSION -DdevelopmentVersion="$NEXT_DEVELOPMENT_VERSION" -DscmCommentPrefix="[skip ci] [maven-release-plugin] " \
-          -Darguments="-DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true -DskipLocalStaging=true" release:prepare 
+          mvn -ntp -B -s .github/maven.settings.xml -DdryRun=true -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true -DskipLocalStaging=true \
+          -Dtag=$TAG_VERSION -DreleaseVersion=$FINAL_RELEASE_VERSION -DdevelopmentVersion="$NEXT_DEVELOPMENT_VERSION" -DscmCommentPrefix="[skip ci] [maven-release-plugin] " release:prepare 
           echo "Perform Release version $FINAL_RELEASE_VERSION with tag $TAG_VERSION"
-          mvn -ntp -B -X -s .github/maven.settings.xml -DdryRun=true -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true -DskipLocalStaging=true \
-          -Darguments="-DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true -DskipLocalStaging=true" release:perform
+          mvn -ntp -B -s .github/maven.settings.xml -DdryRun=true -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true -DskipLocalStaging=true release:perform
