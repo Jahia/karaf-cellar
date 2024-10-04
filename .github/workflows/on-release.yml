@@ -45,6 +45,8 @@ jobs:
           distribution: 'temurin'
       - name: Release with Maven
         run: |
+          echo "Checkout to cellar-4.1.3-jahia-fixes branch"
+          git checkout cellar-4.1.3-jahia-fixes
           TAG_VERSION="${{ github.event.release.tag_name }}" # e.g. cellar-2.20.12-jahia1
           FINAL_RELEASE_VERSION=${TAG_VERSION:7} # extract 2.20.12-jahia1 from the tag
           REVISION=$(echo $FINAL_RELEASE_VERSION  | grep -Eo '[0-9]+$') # extract 1 from 2.20.12-jahia1
@@ -63,9 +65,7 @@ jobs:
           [[ -z "$NEXT_REVISION" ]] && { echo "next revision is empty" ; exit 0; }
           [[ -z "$NEXT_DEVELOPMENT_VERSION" ]] && { echo "next development version is empty" ; exit 0; }
           echo "Prepare release version $FINAL_RELEASE_VERSION with tag $TAG_VERSION"
-          ls .git
-          cat .git/HEAD
-          #mvn -ntp -B -s .github/maven.settings.xml -DdryRun=false -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true -DskipLocalStaging=true \
-          #-Dtag=$TAG_VERSION -DreleaseVersion=$FINAL_RELEASE_VERSION -DdevelopmentVersion="$NEXT_DEVELOPMENT_VERSION" -DscmCommentPrefix="[skip ci] [maven-release-plugin] " release:prepare 
-          #echo "Perform Release version $FINAL_RELEASE_VERSION with tag $TAG_VERSION"
-          #mvn -ntp -B -s .github/maven.settings.xml -DdryRun=false -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true -DskipLocalStaging=true release:perform
+          mvn -ntp -B -s .github/maven.settings.xml -DdryRun=false -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true -DskipLocalStaging=true \
+          -Dtag=$TAG_VERSION -DreleaseVersion=$FINAL_RELEASE_VERSION -DdevelopmentVersion="$NEXT_DEVELOPMENT_VERSION" -DscmCommentPrefix="[skip ci] [maven-release-plugin] " release:prepare 
+          echo "Perform Release version $FINAL_RELEASE_VERSION with tag $TAG_VERSION"
+          mvn -ntp -B -s .github/maven.settings.xml -DdryRun=false -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true -DskipLocalStaging=true release:perform
