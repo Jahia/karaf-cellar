@@ -30,7 +30,7 @@
 
     <groupId>org.apache.karaf</groupId>
     <artifactId>cellar</artifactId>
-    <version>4.1.3-jahia11-SNAPSHOT</version>
+    <version>4.1.3-jahia11</version>
     <packaging>pom</packaging>
     <name>Apache Karaf :: Cellar</name>
 
@@ -80,7 +80,7 @@
         <connection>scm:git:git@github.com:Jahia/karaf-cellar.git</connection>
         <developerConnection>scm:git:git@github.com:Jahia/karaf-cellar.git</developerConnection>
         <url>https://github.com/Jahia/karaf-cellar</url>
-        <tag>cellar-4.1.3-jahia-fixes</tag>
+        <tag>cellar-4.1.3-jahia11</tag>
     </scm>
 
     <distributionManagement>
