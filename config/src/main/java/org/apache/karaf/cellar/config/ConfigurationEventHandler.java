@@ -81,7 +81,7 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
             synchronized (monitor) {
                 Map<String, Properties> clusterConfigurations = clusterManager.getMap(Constants.CONFIGURATION_MAP + Configurations.SEPARATOR + groupName);
                 Dictionary clusterDictionary = clusterConfigurations.get(pid);
-                LOGGER.debug("CELLAR CONFIG: Received event for configuration {}, cluster data : {}", pid, Collections.list(clusterDictionary.keys()));
+                LOGGER.debug("CELLAR CONFIG: Received event for configuration {}, cluster data : {}", pid, clusterDictionary == null ? null : Collections.list(clusterDictionary.keys()));
 
                 // Integrity check and retry if needed
                 boolean clusterConfigIntegrityCheck = integrityCheck(event.getIntegrity(), clusterDictionary);
