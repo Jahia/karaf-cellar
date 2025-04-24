@@ -143,7 +143,7 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
                                 localDictionary = new Properties();
                             }
                             localDictionary = filter(localDictionary);
-                            if (!equals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary)) {
+                            if (!areEquals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary)) {
                                 persistConfiguration(localConfiguration.getPid(), localConfiguration.getProperties(), clusterDictionary);
                                 Dictionary convertedDictionary = convertPropertiesFromCluster(clusterDictionary);
                                 if (!localConfiguration.getPid().equals(pid)) {

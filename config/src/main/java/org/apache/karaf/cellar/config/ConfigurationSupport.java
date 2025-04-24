@@ -87,34 +87,25 @@ public class ConfigurationSupport extends CellarSupport {
      * @param target the target dictionary.
      * @return true if the two dictionaries are equal, false else.
      */
-    protected boolean equals(Dictionary source, Dictionary target) {
-        if (source == null && target == null)
+    protected static boolean areEquals(Dictionary source, Dictionary target) {
+        if (Objects.equals(source, target)) {
             return true;
-
-        if (source == null || target == null)
+        }
+        if (source == null || target == null || source.size() != target.size()) {
             return false;
+        }
 
-        if (source.isEmpty() && target.isEmpty())
-            return true;
-
-        if (source.size() != target.size())
-            return false;
-
-        Enumeration sourceKeys = source.keys();
-        while (sourceKeys.hasMoreElements()) {
-            Object key = sourceKeys.nextElement();
+        Enumeration keys = source.keys();
+        while (keys.hasMoreElements()) {
+            Object key = keys.nextElement();
             if (!key.equals(org.osgi.framework.Constants.SERVICE_PID)) {
                 Object sourceValue = source.get(key);
                 Object targetValue = target.get(key);
-                if (sourceValue != null && targetValue == null)
+                if (!Objects.deepEquals(sourceValue, targetValue)) {
                     return false;
-                if (sourceValue == null && targetValue != null)
-                    return false;
-                if (!sourceValue.equals(targetValue))
-                    return false;
+                }
             }
         }
-
         return true;
     }
 
