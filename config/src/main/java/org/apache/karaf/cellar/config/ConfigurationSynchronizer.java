@@ -138,7 +138,7 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                                     localDictionary = new Properties();
 
                                 localDictionary = filter(localDictionary);
-                                if (!equals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary) && shouldReplicateConfig(clusterDictionary)) {
+                                if (!areEquals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary) && shouldReplicateConfig(clusterDictionary)) {
                                     LOGGER.debug("CELLAR CONFIG: updating configration {} on node", pid);
                                     Dictionary convertedDictionary = convertPropertiesFromCluster(clusterDictionary);
                                     persistConfiguration(localConfiguration.getPid(), localConfiguration.getProperties(), clusterDictionary);
@@ -224,7 +224,7 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                                     eventProducer.produce(event);
                                 } else {
                                     Dictionary clusterDictionary = clusterConfigurations.get(pid);
-                                    if (!equals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary)) {
+                                    if (!areEquals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary)) {
                                         LOGGER.debug("CELLAR CONFIG: updating configuration pid {} on the cluster", pid);
                                         // update cluster configurations
                                         Properties props = dictionaryToProperties(localDictionary);
