@@ -159,6 +159,27 @@ public class ConfigurationSupport extends CellarSupport {
         return result;
     }
 
+    /**
+     * Find a local configuration fed by this file, whatever pid it carries.
+     *
+     * @param filename the karaf.cellar.filename of a configuration.
+     * @return a local configuration reading that file, or null when none does.
+     */
+    protected Configuration findLocalConfigurationByFilename(String filename) throws IOException, InvalidSyntaxException {
+        String uri = new File(storage, filename).toURI().toString();
+        Configuration[] configurations = configurationAdmin.listConfigurations(
+                "(|(" + FELIX_FILEINSTALL_FILENAME + "=" + uri + ")(" + KARAF_CELLAR_FILENAME + "=" + filename + "))");
+        return (configurations != null && configurations.length > 0) ? configurations[0] : null;
+    }
+
+    /**
+     * @param filename the karaf.cellar.filename of a configuration.
+     * @return true when that file is still on disk in the configuration storage directory.
+     */
+    protected boolean configurationFileExists(String filename) {
+        return new File(storage, filename).isFile();
+    }
+
     public Configuration findLocalConfiguration(String pid, Dictionary dictionary) throws IOException, InvalidSyntaxException {
         String filter;
         Object filename = dictionary != null ? dictionary.get(KARAF_CELLAR_FILENAME) : null;

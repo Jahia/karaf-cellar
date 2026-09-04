@@ -87,6 +87,18 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
                             if (event.getType() == ConfigurationEvent.CM_DELETED) {
                                 if (clusterConfigurations.containsKey(pid)) {
                                     String filename = (String) clusterConfigurations.get(pid).get(KARAF_CELLAR_FILENAME);
+                                    if (isRetiredPid(filename)) {
+                                        // The file is still on disk and still feeds a local configuration, so the
+                                        // configuration was not deleted: one of the pids naming that file was
+                                        // retired. Drop that pid from the cluster group and broadcast nothing, or
+                                        // every other node would delete the configuration it is still using.
+                                        LOGGER.info("CELLAR CONFIG: configuration {} was deleted, but {} is still on "
+                                                + "disk and still feeds a local configuration. Removing the pid from "
+                                                + "cluster group {} without a delete event.", pid, filename,
+                                                group.getName());
+                                        clusterConfigurations.remove(pid);
+                                        continue;
+                                    }
                                     List<String> matchingPids = new ArrayList<String>();
                                     for (Map.Entry<String, Properties> entry : clusterConfigurations.entrySet()) {
                                         if (filename.equals(entry.getValue().get(KARAF_CELLAR_FILENAME))
@@ -136,6 +148,41 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
                 } else LOGGER.trace("CELLAR CONFIG: configuration with PID {} is marked BLOCKED OUTBOUND for cluster group {}", pid, group.getName());
             }
         }
+    }
+
+    /**
+     * Tell a retired pid apart from a deleted configuration.
+     * <p>
+     * Both reach this listener as a {@code CM_DELETED} event, and the cluster must treat them differently. Deleting
+     * the file is a deletion, and every node has to apply it. Retiring one of several pids that name the same file
+     * leaves the configuration in service, and broadcasting a deletion for it would remove that configuration on
+     * every other node.
+     * <p>
+     * The two conditions are both required. An operator who removes the file leaves no file on disk, so the deletion
+     * propagates even while another local configuration still reads that file name.
+     *
+     * @param filename the karaf.cellar.filename the deleted pid carried.
+     * @return true when the deletion retired a pid rather than deleted the configuration.
+     */
+    boolean isRetiredPid(String filename) {
+        if (filename == null) {
+            return false;
+        }
+        try {
+            return configurationFileExists(filename) && feedsLocalConfiguration(filename);
+        } catch (Exception e) {
+            LOGGER.warn("CELLAR CONFIG: can't tell whether {} still feeds a local configuration, treating the event "
+                    + "as a deletion", filename, e);
+            return false;
+        }
+    }
+
+    /**
+     * @param filename the karaf.cellar.filename of a configuration.
+     * @return true when a local configuration still reads that file.
+     */
+    protected boolean feedsLocalConfiguration(String filename) throws Exception {
+        return findLocalConfigurationByFilename(filename) != null;
     }
 
     /**
