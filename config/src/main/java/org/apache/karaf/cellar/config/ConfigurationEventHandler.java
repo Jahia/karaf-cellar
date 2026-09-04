@@ -150,6 +150,7 @@ public class ConfigurationEventHandler extends ConfigurationSupport implements E
                                     Properties p = dictionaryToProperties(filter(convertedDictionary));
                                     LOGGER.debug("CELLAR CONFIG: Storing factory configuration local pid: {}, from {} : {}", localConfiguration.getProperties(), pid, Collections.list(localDictionary.keys()));
                                     clusterConfigurations.put(localConfiguration.getPid(), p);
+                                    declareHeldPid(groupName, localConfiguration.getPid());
                                 }
                                 localConfiguration.update(convertedDictionary);
                             }

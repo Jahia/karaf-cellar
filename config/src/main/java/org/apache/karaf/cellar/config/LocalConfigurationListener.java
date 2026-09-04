@@ -131,6 +131,7 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
                                     LOGGER.debug("Storing configuration {} in cluster {}", pid, Collections.list(localDictionary.keys()));
                                     Properties props = dictionaryToProperties(localDictionary);
                                     clusterConfigurations.put(pid, props);
+                                    declareHeldPid(group.getName(), pid);
                                     // send the cluster event
                                     ClusterConfigurationEvent clusterConfigurationEvent = new ClusterConfigurationEvent(pid);
                                     clusterConfigurationEvent.setSourceGroup(group);

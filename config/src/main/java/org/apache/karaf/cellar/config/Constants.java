@@ -21,4 +21,11 @@ public class Constants {
     public static final String CATEGORY = "config";
     public static final String CONFIGURATION_MAP = "org.apache.karaf.cellar.configuration.map";
 
+    /**
+     * Map in which each node declares, under its own id, the configuration pids it holds. It is kept beside the
+     * configuration map rather than inside each entry, because an extra key in a configuration dictionary would make
+     * every local and cluster comparison unequal and produce an update loop.
+     */
+    public static final String CONFIGURATION_HELD_PIDS_MAP = "org.apache.karaf.cellar.configuration.heldpids.map";
+
 }

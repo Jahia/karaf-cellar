@@ -38,6 +38,12 @@ public class ConfigurationSupport extends CellarSupport {
 
     protected File storage;
 
+    /** A newline cannot appear in a configuration pid, so it needs no escaping. */
+    private static final String HELD_PIDS_SEPARATOR = "\n";
+
+    /** Serializes the read-modify-write of this node's own declaration, which several Cellar components perform. */
+    private static final Object HELD_PIDS_LOCK = new Object();
+
     /**
      * Read a {@code Dictionary} and create a corresponding {@code Properties}.
      *
@@ -157,6 +163,81 @@ public class ConfigurationSupport extends CellarSupport {
         result.put(KARAF_CELLAR_FILENAME, dictionary.get(KARAF_CELLAR_FILENAME));
         result.put(KARAF_CELLAR_REMOVED, true);
         return result;
+    }
+
+    /**
+     * Get the map in which each node declares the configuration pids it holds, for one cluster group.
+     *
+     * @param groupName the cluster group name.
+     * @return the map from node id to that node's declaration.
+     */
+    protected Map<String, String> getHeldPidsMap(String groupName) {
+        return clusterManager.getMap(Constants.CONFIGURATION_HELD_PIDS_MAP + Configurations.SEPARATOR + groupName);
+    }
+
+    /**
+     * Declare the whole set of configuration pids the local node holds in a cluster group, replacing its previous
+     * declaration. A pid that has gone is what the replacement removes.
+     *
+     * @param groupName the cluster group name.
+     * @param pids every pid the local node holds and publishes to that cluster group.
+     */
+    protected void declareHeldPids(String groupName, Set<String> pids) {
+        synchronized (HELD_PIDS_LOCK) {
+            getHeldPidsMap(groupName).put(getLocalNodeId(), joinPids(pids));
+        }
+    }
+
+    /**
+     * Add one pid to what the local node declares it holds, so that an entry published between two synchronizations
+     * is not read as an entry no node holds.
+     *
+     * @param groupName the cluster group name.
+     * @param pid the pid the local node has just published.
+     */
+    protected void declareHeldPid(String groupName, String pid) {
+        synchronized (HELD_PIDS_LOCK) {
+            Map<String, String> declarations = getHeldPidsMap(groupName);
+            String nodeId = getLocalNodeId();
+            Set<String> pids = readHeldPids(declarations.get(nodeId));
+            if (pids.add(pid)) {
+                declarations.put(nodeId, joinPids(pids));
+            }
+        }
+    }
+
+    /**
+     * @return the id of the local node.
+     */
+    protected String getLocalNodeId() {
+        return clusterManager.getNode().getId();
+    }
+
+    /**
+     * @param declaration the value one node wrote in the held pids map, or null.
+     * @return the pids it names, empty when there is no declaration.
+     */
+    protected Set<String> readHeldPids(String declaration) {
+        Set<String> pids = new LinkedHashSet<String>();
+        if (declaration != null && declaration.length() > 0) {
+            for (String pid : declaration.split(HELD_PIDS_SEPARATOR)) {
+                if (pid.length() > 0) {
+                    pids.add(pid);
+                }
+            }
+        }
+        return pids;
+    }
+
+    private static String joinPids(Set<String> pids) {
+        StringBuilder declaration = new StringBuilder();
+        for (String pid : pids) {
+            if (declaration.length() > 0) {
+                declaration.append(HELD_PIDS_SEPARATOR);
+            }
+            declaration.append(pid);
+        }
+        return declaration.toString();
     }
 
     /**
