@@ -526,9 +526,9 @@
                                     <version>[3,4)</version>
                                 </requireMavenVersion>
                                 <requireJavaVersion>
-                                    <!-- R7 needs Java 8, and the Karaf 4.1 tooling needs the JAXB classes that
-                                         Java 11 removed from the JDK, so 8 is both the floor and what CI uses -->
-                                    <version>[1.8,)</version>
+                                    <!-- the Karaf 4.3 tooling the assembly verifies with needs a JDK 11; the
+                                         artifacts themselves still compile to 1.7 bytecode -->
+                                    <version>[11,)</version>
                                 </requireJavaVersion>
                             </rules>
                         </configuration>
@@ -607,7 +607,7 @@
                                             <version>[3,4)</version>
                                         </requireMavenVersion>
                                         <requireJavaVersion>
-                                            <version>[1.8,)</version>
+                                            <version>[11,)</version>
                                         </requireJavaVersion>
                                     </rules>
                                 </configuration>
