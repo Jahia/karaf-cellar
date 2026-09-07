@@ -45,8 +45,11 @@
         <joda-time.version>2.9.1</joda-time.version>
         <junit.version>4.12</junit.version>
         <karaf.version>4.1.2</karaf.version>
-        <osgi.version>6.0.0</osgi.version>
-        <osgi.compendium.version>5.0.0</osgi.compendium.version>
+        <!-- the Karaf the bundles are deployed into, and therefore what the assembly resolves them
+             against; the compile dependencies above stay on 4.1.2 -->
+        <karaf.verify.version>4.3.10</karaf.verify.version>
+        <osgi.version>7.0.0</osgi.version>
+        <osgi.compendium.version>7.0.0</osgi.compendium.version>
         <slf4j.version>1.7.7</slf4j.version>
         <netflix.feign.version>8.13.1</netflix.feign.version>
         <gson.version>2.3</gson.version>
@@ -212,6 +215,7 @@
                 <artifactId>org.apache.felix.utils</artifactId>
                 <version>${felix.utils.version}</version>
                 <exclusions>
+                    <!-- felix.utils declares the identifiers OSGi used before R7, so the exclusions keep them -->
                     <exclusion>
                         <groupId>org.osgi</groupId>
                         <artifactId>org.osgi.core</artifactId>
@@ -267,12 +271,12 @@
             <!-- OSGi -->
             <dependency>
                 <groupId>org.osgi</groupId>
-                <artifactId>org.osgi.compendium</artifactId>
+                <artifactId>osgi.cmpn</artifactId>
                 <version>${osgi.compendium.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.osgi</groupId>
-                <artifactId>org.osgi.core</artifactId>
+                <artifactId>osgi.core</artifactId>
                 <version>${osgi.version}</version>
             </dependency>
 
@@ -313,13 +317,6 @@
                 <groupId>joda-time</groupId>
                 <artifactId>joda-time</artifactId>
                 <version>${joda-time.version}</version>
-            </dependency>
-
-            <!--Apache common-lang-->
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-lang3</artifactId>
-                <version>${apache.commons.lang3.version}</version>
             </dependency>
 
             <!-- Kubernetes -->
@@ -529,7 +526,9 @@
                                     <version>[3,4)</version>
                                 </requireMavenVersion>
                                 <requireJavaVersion>
-                                    <version>[1.7,1.9)</version>
+                                    <!-- the Karaf 4.3 tooling the assembly verifies with needs a JDK 11; the
+                                         artifacts themselves still compile to 1.7 bytecode -->
+                                    <version>[11,)</version>
                                 </requireJavaVersion>
                             </rules>
                         </configuration>
@@ -608,7 +607,7 @@
                                             <version>[3,4)</version>
                                         </requireMavenVersion>
                                         <requireJavaVersion>
-                                            <version>[1.7,1.9)</version>
+                                            <version>[11,)</version>
                                         </requireJavaVersion>
                                     </rules>
                                 </configuration>
