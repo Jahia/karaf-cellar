@@ -45,8 +45,8 @@
         <joda-time.version>2.9.1</joda-time.version>
         <junit.version>4.12</junit.version>
         <karaf.version>4.1.2</karaf.version>
-        <osgi.version>6.0.0</osgi.version>
-        <osgi.compendium.version>5.0.0</osgi.compendium.version>
+        <osgi.version>7.0.0</osgi.version>
+        <osgi.compendium.version>7.0.0</osgi.compendium.version>
         <slf4j.version>1.7.7</slf4j.version>
         <netflix.feign.version>8.13.1</netflix.feign.version>
         <gson.version>2.3</gson.version>
@@ -212,6 +212,7 @@
                 <artifactId>org.apache.felix.utils</artifactId>
                 <version>${felix.utils.version}</version>
                 <exclusions>
+                    <!-- felix.utils declares the identifiers OSGi used before R7, so the exclusions keep them -->
                     <exclusion>
                         <groupId>org.osgi</groupId>
                         <artifactId>org.osgi.core</artifactId>
@@ -267,12 +268,12 @@
             <!-- OSGi -->
             <dependency>
                 <groupId>org.osgi</groupId>
-                <artifactId>org.osgi.compendium</artifactId>
+                <artifactId>osgi.cmpn</artifactId>
                 <version>${osgi.compendium.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.osgi</groupId>
-                <artifactId>org.osgi.core</artifactId>
+                <artifactId>osgi.core</artifactId>
                 <version>${osgi.version}</version>
             </dependency>
 
@@ -529,7 +530,9 @@
                                     <version>[3,4)</version>
                                 </requireMavenVersion>
                                 <requireJavaVersion>
-                                    <version>[1.7,1.9)</version>
+                                    <!-- R7 needs Java 8, and the Karaf 4.1 tooling needs the JAXB classes that
+                                         Java 11 removed from the JDK, so 8 is both the floor and what CI uses -->
+                                    <version>[1.8,)</version>
                                 </requireJavaVersion>
                             </rules>
                         </configuration>
@@ -608,7 +611,7 @@
                                             <version>[3,4)</version>
                                         </requireMavenVersion>
                                         <requireJavaVersion>
-                                            <version>[1.7,1.9)</version>
+                                            <version>[1.8,)</version>
                                         </requireJavaVersion>
                                     </rules>
                                 </configuration>
