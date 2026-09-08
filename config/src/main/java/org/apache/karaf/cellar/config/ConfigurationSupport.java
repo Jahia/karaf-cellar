@@ -308,9 +308,14 @@ public class ConfigurationSupport extends CellarSupport {
      * @param localConfiguration the configuration PID to delete.
      */
     protected void deleteConfiguration(Configuration localConfiguration) throws IOException {
+        // Read everything this method needs before deleting, because Configuration Admin answers nothing about a
+        // configuration that is gone: Felix checks for the deletion in getPid as well as in getProperties, and
+        // throws IllegalStateException. The file name is only missing when no file feeds the configuration, so the
+        // pid was read after the deletion exactly in the case where it is the one thing left to read.
+        String pid = localConfiguration.getPid();
         String filename = getKarafFilename(localConfiguration.getProperties());
         localConfiguration.delete();
-        File cfgFile = new File(storage, filename == null ? (localConfiguration.getPid() + ".cfg") : filename);
+        File cfgFile = new File(storage, filename == null ? (pid + ".cfg") : filename);
         if (cfgFile.exists()) {
             cfgFile.delete();
         }
