@@ -169,7 +169,7 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                                 Properties current = clusterConfigurations.get(pid);
                                 boolean unchanged = areEquals(clusterDictionary, current);
                                 if (!unchanged) {
-                                    LOGGER.debug("CELLAR CONFIG: configuration with PID {} changed in cluster group {} while pulling, deferring it to the next pull", pid, groupName);
+                                    LOGGER.debug("CELLAR CONFIG: configuration with PID {} no longer matches the entry read under the monitor in cluster group {}, deferring it to the next pull", pid, groupName);
                                 }
                                 if (!areEquals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary) && unchanged) {
                                     LOGGER.debug("CELLAR CONFIG: updating configration {} on node", pid);
