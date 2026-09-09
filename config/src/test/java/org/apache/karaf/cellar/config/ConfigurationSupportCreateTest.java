@@ -7,7 +7,6 @@ import org.junit.rules.TemporaryFolder;
 import org.osgi.service.cm.Configuration;
 import org.osgi.service.cm.ConfigurationAdmin;
 
-import java.io.File;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -16,7 +15,6 @@ import java.util.Hashtable;
 import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertSame;
 
 /**
  * Covers the pid a configuration receives when this node learns it from the cluster rather than from its own file.
