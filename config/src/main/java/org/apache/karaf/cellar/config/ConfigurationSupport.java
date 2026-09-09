@@ -151,12 +151,28 @@ public class ConfigurationSupport extends CellarSupport {
         return result;
     }
 
+    /**
+     * Build the entry that marks a configuration as deleted for the rest of the cluster.
+     * <p>
+     * Properties is a Hashtable, so putting a null value throws. Neither of the two properties copied here is
+     * guaranteed to be present: push puts a new pid in the map without consulting canDistributeConfig, which only
+     * asks for a file name when the configuration belongs to a factory, so a singleton configuration that no file
+     * feeds has an entry with no karaf.cellar.filename. Copy what is there and leave out what is not, because a
+     * marker that cannot be built is a deletion no other node ever hears about.
+     */
     public Properties getDeletedConfigurationMarker(Dictionary dictionary) {
         Properties result = new Properties();
-        result.put(org.osgi.framework.Constants.SERVICE_PID, dictionary.get(org.osgi.framework.Constants.SERVICE_PID));
-        result.put(KARAF_CELLAR_FILENAME, dictionary.get(KARAF_CELLAR_FILENAME));
+        copyIfPresent(dictionary, result, org.osgi.framework.Constants.SERVICE_PID);
+        copyIfPresent(dictionary, result, KARAF_CELLAR_FILENAME);
         result.put(KARAF_CELLAR_REMOVED, true);
         return result;
+    }
+
+    private static void copyIfPresent(Dictionary source, Properties target, String key) {
+        Object value = source.get(key);
+        if (value != null) {
+            target.put(key, value);
+        }
     }
 
     public Configuration findLocalConfiguration(String pid, Dictionary dictionary) throws IOException, InvalidSyntaxException {

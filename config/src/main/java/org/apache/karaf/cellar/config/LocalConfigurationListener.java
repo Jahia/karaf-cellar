@@ -85,19 +85,29 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
                     synchronized (clusterConfigurations) {
                         try {
                             if (event.getType() == ConfigurationEvent.CM_DELETED) {
-                                if (clusterConfigurations.containsKey(pid)) {
-                                    String filename = (String) clusterConfigurations.get(pid).get(KARAF_CELLAR_FILENAME);
-                                    List<String> matchingPids = new ArrayList<String>();
-                                    for (Map.Entry<String, Properties> entry : clusterConfigurations.entrySet()) {
-                                        if (filename.equals(entry.getValue().get(KARAF_CELLAR_FILENAME))
-                                                && entry.getValue().get(KARAF_CELLAR_REMOVED) == null) {
-                                            matchingPids.add(entry.getKey());
+                                // The map is written by every node, so containsKey proves nothing about the get
+                                // that follows it. Read each entry once and carry its properties: reading a pid
+                                // again below would let a removal turn this into a NullPointerException, and the
+                                // deletion would then never be marked for the other nodes.
+                                Properties deleted = clusterConfigurations.get(pid);
+                                if (deleted != null) {
+                                    Object filename = deleted.get(KARAF_CELLAR_FILENAME);
+                                    Map<String, Properties> matching = new LinkedHashMap<String, Properties>();
+                                    if (filename == null) {
+                                        // nothing ties this configuration to a file, so it answers for itself alone
+                                        matching.put(pid, deleted);
+                                    } else {
+                                        for (Map.Entry<String, Properties> entry : clusterConfigurations.entrySet()) {
+                                            if (filename.equals(entry.getValue().get(KARAF_CELLAR_FILENAME))
+                                                    && entry.getValue().get(KARAF_CELLAR_REMOVED) == null) {
+                                                matching.put(entry.getKey(), entry.getValue());
+                                            }
                                         }
                                     }
-                                    for (String matchingPid : matchingPids) {
+                                    for (Map.Entry<String, Properties> match : matching.entrySet()) {
                                         // update the configurations in the cluster group
-                                        LOGGER.debug("Marking config {} for deletion", matchingPid);
-                                        clusterConfigurations.put(matchingPid, getDeletedConfigurationMarker(clusterConfigurations.get(matchingPid)));
+                                        LOGGER.debug("Marking config {} for deletion", match.getKey());
+                                        clusterConfigurations.put(match.getKey(), getDeletedConfigurationMarker(match.getValue()));
                                     }
                                     // send the cluster event
                                     ClusterConfigurationEvent clusterConfigurationEvent = new ClusterConfigurationEvent(pid);

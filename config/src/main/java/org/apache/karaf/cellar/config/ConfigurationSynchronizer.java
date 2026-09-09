@@ -123,9 +123,21 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
 
                 // get configurations on the cluster to update local configurations
                 for (String pid : clusterConfigurations.keySet()) {
-                    if (isAllowed(group, Constants.CATEGORY, pid, EventType.INBOUND) && shouldReplicateConfig(clusterConfigurations.get(pid))) {
+                    // The key set is a snapshot and every node writes this map, so the entry can be gone by the
+                    // time it is read. It is read twice on purpose: once to decide whether to take the monitor, and
+                    // again while holding it, because a deletion marker written between the two has to be seen.
+                    // Acting on the first read would apply a value the cluster has since replaced, and the update
+                    // would publish it back over the marker.
+                    Properties sampled = clusterConfigurations.get(pid);
+                    if (sampled == null) {
+                        LOGGER.debug("CELLAR CONFIG: configuration with PID {} was removed from cluster group {} while pulling", pid, groupName);
+                    } else if (isAllowed(group, Constants.CATEGORY, pid, EventType.INBOUND) && shouldReplicateConfig(sampled)) {
                         synchronized (clusterConfigurations) {
                             Dictionary clusterDictionary = clusterConfigurations.get(pid);
+                            if (clusterDictionary == null || !shouldReplicateConfig(clusterDictionary)) {
+                                LOGGER.debug("CELLAR CONFIG: configuration with PID {} was removed or marked deleted in cluster group {} while pulling", pid, groupName);
+                                continue;
+                            }
                             try {
                                 // update the local configuration if needed
                                 Configuration localConfiguration = findLocalConfiguration(pid, clusterDictionary);
@@ -162,7 +174,8 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                         filenames.remove(null);
                         for (Configuration configuration : configurationAdmin.listConfigurations(null)) {
                             String pid = configuration.getPid();
-                            if ((!clusterConfigurations.containsKey(pid) || !shouldReplicateConfig(clusterConfigurations.get(pid))) && !filenames.contains(getKarafFilename(configuration.getProperties())) && isAllowed(group, Constants.CATEGORY, pid, EventType.INBOUND)) {
+                            Properties clusterDictionary = clusterConfigurations.get(pid);
+                            if ((clusterDictionary == null || !shouldReplicateConfig(clusterDictionary)) && !filenames.contains(getKarafFilename(configuration.getProperties())) && isAllowed(group, Constants.CATEGORY, pid, EventType.INBOUND)) {
                                 LOGGER.debug("CELLAR CONFIG: deleting local configuration {} which is not present in cluster", pid);
                                 deleteConfiguration(configuration);
                             }
