@@ -123,9 +123,21 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
 
                 // get configurations on the cluster to update local configurations
                 for (String pid : clusterConfigurations.keySet()) {
-                    if (isAllowed(group, Constants.CATEGORY, pid, EventType.INBOUND) && shouldReplicateConfig(clusterConfigurations.get(pid))) {
+                    // The key set is a snapshot and every node writes this map, so the entry can be gone by the
+                    // time it is read. It is read twice on purpose: once to decide whether to take the monitor, and
+                    // again while holding it, because a deletion marker written between the two has to be seen.
+                    // Acting on the first read would apply a value the cluster has since replaced, and the update
+                    // would publish it back over the marker.
+                    Properties sampled = clusterConfigurations.get(pid);
+                    if (sampled == null) {
+                        LOGGER.debug("CELLAR CONFIG: configuration with PID {} was removed from cluster group {} while pulling", pid, groupName);
+                    } else if (isAllowed(group, Constants.CATEGORY, pid, EventType.INBOUND) && shouldReplicateConfig(sampled)) {
                         synchronized (clusterConfigurations) {
                             Dictionary clusterDictionary = clusterConfigurations.get(pid);
+                            if (clusterDictionary == null || !shouldReplicateConfig(clusterDictionary)) {
+                                LOGGER.debug("CELLAR CONFIG: configuration with PID {} was removed or marked deleted in cluster group {} while pulling", pid, groupName);
+                                continue;
+                            }
                             try {
                                 // update the local configuration if needed
                                 Configuration localConfiguration = findLocalConfiguration(pid, clusterDictionary);
@@ -138,7 +150,28 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                                     localDictionary = new Properties();
 
                                 localDictionary = filter(localDictionary);
-                                if (!areEquals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary) && shouldReplicateConfig(clusterDictionary)) {
+                                // Read the entry from the map again rather than re-testing the reference above.
+                                // A put replaces the entry, it does not mutate the instance already held, so
+                                // testing that instance sees nothing written since it was read, and the work
+                                // between the two is a Configuration Admin lookup, a filter that reads the node
+                                // configuration per key, and a file write. What this cannot close is a marker
+                                // written on another node: the map is a Hazelcast ReplicatedMap, so that write
+                                // is not visible here until replication lands, whichever line reads it.
+                                // The entry has to be unchanged since it was read under the monitor, because what
+                                // is applied below is that read and not this one. A newer value another node
+                                // pushed would otherwise pass the gate and lose to the older one: the update
+                                // fires a CM_UPDATED, and LocalConfigurationListener publishes the local value
+                                // back over the newer entry. When it has changed this pull defers the pid, and
+                                // the push that changed it produced a cluster event that brings it here anyway.
+                                // areEquals is null-safe, and clusterDictionary is never a marker because it
+                                // passed the guard above, so one term covers an entry that changed, one that is
+                                // gone and one that is now a marker.
+                                Properties current = clusterConfigurations.get(pid);
+                                boolean unchanged = areEquals(clusterDictionary, current);
+                                if (!unchanged) {
+                                    LOGGER.debug("CELLAR CONFIG: configuration with PID {} changed in cluster group {} while pulling, deferring it to the next pull", pid, groupName);
+                                }
+                                if (!areEquals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary) && unchanged) {
                                     LOGGER.debug("CELLAR CONFIG: updating configration {} on node", pid);
                                     Dictionary convertedDictionary = convertPropertiesFromCluster(clusterDictionary);
                                     persistConfiguration(localConfiguration.getPid(), localConfiguration.getProperties(), clusterDictionary);
@@ -162,7 +195,8 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                         filenames.remove(null);
                         for (Configuration configuration : configurationAdmin.listConfigurations(null)) {
                             String pid = configuration.getPid();
-                            if ((!clusterConfigurations.containsKey(pid) || !shouldReplicateConfig(clusterConfigurations.get(pid))) && !filenames.contains(getKarafFilename(configuration.getProperties())) && isAllowed(group, Constants.CATEGORY, pid, EventType.INBOUND)) {
+                            Properties clusterDictionary = clusterConfigurations.get(pid);
+                            if ((clusterDictionary == null || !shouldReplicateConfig(clusterDictionary)) && !filenames.contains(getKarafFilename(configuration.getProperties())) && isAllowed(group, Constants.CATEGORY, pid, EventType.INBOUND)) {
                                 LOGGER.debug("CELLAR CONFIG: deleting local configuration {} which is not present in cluster", pid);
                                 deleteConfiguration(configuration);
                             }

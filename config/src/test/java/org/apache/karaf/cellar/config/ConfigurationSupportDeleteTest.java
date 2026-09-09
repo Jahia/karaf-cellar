@@ -4,13 +4,11 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.osgi.framework.ServiceReference;
 import org.osgi.service.cm.Configuration;
 
 import java.io.File;
 import java.util.Dictionary;
 import java.util.Hashtable;
-import java.util.Set;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -81,100 +79,50 @@ public class ConfigurationSupportDeleteTest {
     }
 
     /**
-     * Answers like Felix: every read of a deleted configuration throws IllegalStateException.
+     * Answers like Felix: a read of a deleted configuration throws IllegalStateException. deleteConfiguration
+     * makes two of them, getPid and getProperties, and getFactoryPid is guarded against a third that does not
+     * exist yet, because a read added on the wrong side of the delete is the defect this file catches. The rest
+     * comes from StubConfiguration, so one hand-maintained implementation of Configuration in this package is
+     * enough to keep up with what the OSGi Compendium adds, and its own answers are inert here.
      */
-    private static class DeletableConfiguration implements Configuration {
+    private static class DeletableConfiguration extends StubConfiguration {
 
-        private final String pid;
-        private final Dictionary<String, Object> properties;
         private boolean deleted;
 
         private DeletableConfiguration(String pid, Dictionary<String, Object> properties) {
-            this.pid = pid;
-            this.properties = properties;
+            super(pid, properties);
         }
 
         private void checkDeleted() {
             if (deleted) {
-                throw new IllegalStateException("Configuration " + pid + " deleted");
+                throw new IllegalStateException("Configuration " + super.getPid() + " deleted");
             }
         }
 
         @Override
         public String getPid() {
             checkDeleted();
-            return pid;
+            return super.getPid();
         }
 
         @Override
         public Dictionary<String, Object> getProperties() {
             checkDeleted();
-            return properties;
+            return super.getProperties();
+        }
+
+        @Override
+        public String getFactoryPid() {
+            // deleteConfiguration does not read this today; the check is here so that adding such a read on the
+            // wrong side of the delete fails here rather than in a cluster
+            checkDeleted();
+            return super.getFactoryPid();
         }
 
         @Override
         public void delete() {
             checkDeleted();
             deleted = true;
-        }
-
-        @Override
-        public String getFactoryPid() {
-            checkDeleted();
-            return null;
-        }
-
-        // Nothing below is reached by deleteConfiguration. They fail loudly rather than quietly, so a later
-        // change that starts calling one of them shows up here instead of passing.
-
-        @Override
-        public Dictionary<String, Object> getProcessedProperties(ServiceReference<?> reference) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void update(Dictionary<String, ?> properties) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void update() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean updateIfDifferent(Dictionary<String, ?> properties) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void setBundleLocation(String location) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public String getBundleLocation() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public long getChangeCount() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void addAttributes(ConfigurationAttribute... attributes) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Set<ConfigurationAttribute> getAttributes() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void removeAttributes(ConfigurationAttribute... attributes) {
-            throw new UnsupportedOperationException();
         }
     }
 }
