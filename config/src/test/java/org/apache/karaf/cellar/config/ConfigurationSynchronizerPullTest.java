@@ -1,13 +1,15 @@
 package org.apache.karaf.cellar.config;
 
+import org.apache.karaf.cellar.core.Configurations;
 import org.apache.karaf.cellar.core.Group;
 import org.apache.karaf.cellar.core.event.EventType;
 import org.junit.Before;
-import org.apache.karaf.cellar.core.Configurations;
-import org.apache.karaf.cellar.config.Constants;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.osgi.service.cm.Configuration;
 
+import java.io.File;
 import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.Hashtable;
@@ -30,6 +32,9 @@ public class ConfigurationSynchronizerPullTest {
     private static final String PID = "org.jahia.bundles.api.authorization~sam";
     private static final String FILENAME = "org.jahia.bundles.api.authorization-sam.yml";
 
+    @Rule
+    public TemporaryFolder storage = new TemporaryFolder();
+
     private MutatingMap clusterMap;
     private RecordingConfiguration local;
     private ConfigurationSynchronizer synchronizer;
@@ -46,14 +51,14 @@ public class ConfigurationSynchronizerPullTest {
         marker.put("karaf.cellar.filename", FILENAME);
         marker.put("karaf.cellar.removed", true);
 
-        clusterMap = new MutatingMap(PID, live, marker);
+        clusterMap = new MutatingMap(PID, live, marker, 1);
 
         Hashtable<String, Object> localProperties = new Hashtable<>();
         localProperties.put("service.pid", PID);
         localProperties.put("felix.fileinstall.filename", FILENAME);
         local = new RecordingConfiguration(PID, localProperties);
 
-        synchronizer = new TestSynchronizer(clusterMap, local);
+        synchronizer = new TestSynchronizer(clusterMap, local, storage.getRoot());
     }
 
     /**
@@ -84,6 +89,27 @@ public class ConfigurationSynchronizerPullTest {
     }
 
     /**
+     * The other shape of the same window: the entry is not deleted but replaced by a newer value another node
+     * pushed. Applying the value read under the monitor would write the older one locally, and the CM_UPDATED
+     * that follows has LocalConfigurationListener publish it back over the newer entry, so the cluster loses the
+     * newer value to the node that was synchronising.
+     */
+    @Test
+    public void GIVEN_an_entry_replaced_while_pulling_WHEN_pulling_THEN_the_local_configuration_is_not_updated() {
+        Properties newer = new Properties();
+        newer.put("service.pid", PID);
+        newer.put("karaf.cellar.filename", FILENAME);
+        newer.put("healthcheck.grants[6].api", "graphql.GqlProbeStatus");
+        newer.put("healthcheck.grants[7].api", "graphql.GqlSomethingNewer");
+
+        MutatingMap replaced = new MutatingMap(PID, clusterMap.first, newer, 2);
+        RecordingConfiguration local = new RecordingConfiguration(PID, this.local.getProperties());
+        new TestSynchronizer(replaced, local, storage.getRoot()).pull(new Group("default"));
+
+        assertFalse("pull() applied a value the cluster had already replaced", local.updated);
+    }
+
+    /**
      * The local cleanup deletes the configurations the cluster no longer holds, and it reads its entry once now
      * instead of a containsKey followed by a get. Reached by seeding the synchronizer map with the group's key,
      * which is the condition that block is guarded by.
@@ -95,25 +121,31 @@ public class ConfigurationSynchronizerPullTest {
         orphanProperties.put("service.pid", "org.cortex.orphan");
         RecordingConfiguration orphan = new RecordingConfiguration("org.cortex.orphan", orphanProperties);
 
-        TestSynchronizer withCleanup = new TestSynchronizer(clusterMap, orphan);
+        TestSynchronizer withCleanup = new TestSynchronizer(clusterMap, orphan, storage.getRoot());
         withCleanup.synchronizerMap.put(Constants.CONFIGURATION_MAP + Configurations.SEPARATOR + "default", true);
         withCleanup.pull(new Group("default"));
 
         assertTrue("the cleanup did not delete a configuration the cluster no longer holds", orphan.deleted);
     }
 
-    /** Answers the live value once, then the deletion marker, and counts its reads. */
+    /**
+     * Answers one value for the first reads and another after, and counts its reads. Which read flips is the
+     * point: pull() reads the entry to decide whether to take the monitor, again while holding it, and once more
+     * at the update site, and each gap is a window a write from another node can land in.
+     */
     private static class MutatingMap extends HashMap<String, Properties> {
 
         private final String pid;
-        private final Properties first;
+        final Properties first;
         private final Properties rest;
+        private final int flipAfter;
         private transient int reads;
 
-        private MutatingMap(String pid, Properties first, Properties rest) {
+        private MutatingMap(String pid, Properties first, Properties rest, int flipAfter) {
             this.pid = pid;
             this.first = first;
             this.rest = rest;
+            this.flipAfter = flipAfter;
             super.put(pid, first);
         }
 
@@ -123,7 +155,7 @@ public class ConfigurationSynchronizerPullTest {
                 return super.get(key);
             }
             reads++;
-            return reads == 1 ? first : rest;
+            return reads <= flipAfter ? first : rest;
         }
     }
 
@@ -155,12 +187,12 @@ public class ConfigurationSynchronizerPullTest {
         private final Configuration local;
         private final Map<String, Boolean> synchronizerMap = new HashMap<>();
 
-        private TestSynchronizer(Map<String, Properties> map, Configuration local) {
+        private TestSynchronizer(Map<String, Properties> map, Configuration local, File storageRoot) {
             this.map = map;
             this.local = local;
             this.clusterManager = new StubClusterManager(map);
             this.configurationAdmin = new StubConfigurationAdmin(local);
-            setStorage(new java.io.File(System.getProperty("java.io.tmpdir")));
+            setStorage(storageRoot);
         }
 
         @Override

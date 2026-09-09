@@ -157,9 +157,17 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                                 // configuration per key, and a file write. What this cannot close is a marker
                                 // written on another node: the map is a Hazelcast ReplicatedMap, so that write
                                 // is not visible here until replication lands, whichever line reads it.
+                                // The entry has to be unchanged since it was read under the monitor, because what
+                                // is applied below is that read and not this one. A newer value another node
+                                // pushed would otherwise pass the gate and lose to the older one: the update
+                                // fires a CM_UPDATED, and LocalConfigurationListener publishes the local value
+                                // back over the newer entry. When it has changed this pull defers the pid, and
+                                // the push that changed it produced a cluster event that brings it here anyway.
+                                // areEquals is null-safe and clusterDictionary is never a marker, so this covers
+                                // an entry that is gone and an entry marked deleted as well.
                                 Properties current = clusterConfigurations.get(pid);
                                 if (!areEquals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary)
-                                        && current != null && shouldReplicateConfig(current)) {
+                                        && areEquals(clusterDictionary, current)) {
                                     LOGGER.debug("CELLAR CONFIG: updating configration {} on node", pid);
                                     Dictionary convertedDictionary = convertPropertiesFromCluster(clusterDictionary);
                                     persistConfiguration(localConfiguration.getPid(), localConfiguration.getProperties(), clusterDictionary);

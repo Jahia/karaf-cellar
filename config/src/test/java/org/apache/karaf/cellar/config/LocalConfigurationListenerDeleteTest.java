@@ -2,7 +2,6 @@ package org.apache.karaf.cellar.config;
 
 import org.apache.karaf.cellar.core.Group;
 import org.apache.karaf.cellar.core.GroupManager;
-import org.apache.karaf.cellar.core.Node;
 import org.apache.karaf.cellar.core.control.BasicSwitch;
 import org.apache.karaf.cellar.core.control.Switch;
 import org.apache.karaf.cellar.core.control.SwitchStatus;
@@ -31,6 +30,7 @@ import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -44,7 +44,6 @@ public class LocalConfigurationListenerDeleteTest {
 
     private static final String PID = "org.jahia.bundles.api.authorization~sam";
     private static final String FILENAME = "org.jahia.bundles.api.authorization-sam.yml";
-    private static final String MAP = "org.apache.karaf.cellar.configuration.map.default";
 
     private Map<String, Properties> clusterMap;
     private List<Event> produced;
@@ -99,6 +98,23 @@ public class LocalConfigurationListenerDeleteTest {
         assertNull("an unrelated configuration with no file name was marked too",
                 clusterMap.get("org.cortex.unrelated").get("karaf.cellar.removed"));
         assertEquals(1, produced.size());
+    }
+
+    /**
+     * An entry that is already a marker is left alone, which is the condition the loop over a file's entries
+     * applies and this branch did not. assertSame is what carries it: the marker the code would rebuild is
+     * identical to the one already there, so an equality check passes either way, and the cost of rebuilding it
+     * is a write to a replicated map and a replication round for no change.
+     */
+    @Test
+    public void GIVEN_an_entry_no_file_feeds_that_is_already_a_marker_WHEN_it_is_deleted_locally_THEN_nothing_is_rewritten() {
+        Properties marker = entry(PID, null, true);
+        clusterMap.put(PID, marker);
+
+        listener.configurationEvent(deletionOf(PID));
+
+        assertSame("an identical marker was rewritten to the replicated map", marker, clusterMap.get(PID));
+        assertEquals("the deletion was not announced", 1, produced.size());
     }
 
     @Test
