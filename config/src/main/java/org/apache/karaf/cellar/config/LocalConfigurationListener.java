@@ -94,8 +94,13 @@ public class LocalConfigurationListener extends ConfigurationSupport implements 
                                     Object filename = deleted.get(KARAF_CELLAR_FILENAME);
                                     Map<String, Properties> matching = new LinkedHashMap<String, Properties>();
                                     if (filename == null) {
-                                        // nothing ties this configuration to a file, so it answers for itself alone
-                                        matching.put(pid, deleted);
+                                        // Nothing ties this configuration to a file, so it answers for itself
+                                        // alone. Skipped when it is already a marker, which is the condition the
+                                        // loop below applies: rebuilding an identical marker is a replicated
+                                        // write and a replication round for no change.
+                                        if (deleted.get(KARAF_CELLAR_REMOVED) == null) {
+                                            matching.put(pid, deleted);
+                                        }
                                     } else {
                                         for (Map.Entry<String, Properties> entry : clusterConfigurations.entrySet()) {
                                             if (filename.equals(entry.getValue().get(KARAF_CELLAR_FILENAME))

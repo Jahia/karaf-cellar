@@ -17,14 +17,20 @@ class StubConfigurationAdmin implements ConfigurationAdmin {
         return configurations.length == 0 ? null : configurations;
     }
 
+    /**
+     * Configuration Admin always answers this, creating the configuration when it does not exist, and Cellar
+     * reads its own node configuration through it to find out whether a property is set. Answering with a
+     * configuration that carries no properties is what an untouched node looks like, and lets the caller's
+     * default apply. Throwing here instead would abort the caller for a reason that has nothing to do with it.
+     */
     @Override
     public Configuration getConfiguration(String pid, String location) {
-        throw new UnsupportedOperationException();
+        return new StubConfiguration(pid, null);
     }
 
     @Override
     public Configuration getConfiguration(String pid) {
-        throw new UnsupportedOperationException();
+        return getConfiguration(pid, null);
     }
 
     @Override

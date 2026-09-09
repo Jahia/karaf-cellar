@@ -158,7 +158,8 @@ public class ConfigurationSupport extends CellarSupport {
      * guaranteed to be present: push puts a new pid in the map without consulting canDistributeConfig, which only
      * asks for a file name when the configuration belongs to a factory, so a singleton configuration that no file
      * feeds has an entry with no karaf.cellar.filename. Copy what is there and leave out what is not, because a
-     * marker that cannot be built is a deletion no other node ever hears about.
+     * marker that cannot be built is a deletion no other node ever hears about. A null dictionary is read the
+     * same way, and gives the bare marker.
      */
     public Properties getDeletedConfigurationMarker(Dictionary dictionary) {
         Properties result = new Properties();
@@ -169,7 +170,7 @@ public class ConfigurationSupport extends CellarSupport {
     }
 
     private static void copyIfPresent(Dictionary source, Properties target, String key) {
-        Object value = source.get(key);
+        Object value = source != null ? source.get(key) : null;
         if (value != null) {
             target.put(key, value);
         }

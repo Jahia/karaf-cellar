@@ -1,24 +1,21 @@
 package org.apache.karaf.cellar.config;
 
-import org.apache.karaf.cellar.core.ClusterManager;
 import org.apache.karaf.cellar.core.Group;
-import org.apache.karaf.cellar.core.Node;
 import org.apache.karaf.cellar.core.event.EventType;
 import org.junit.Before;
+import org.apache.karaf.cellar.core.Configurations;
+import org.apache.karaf.cellar.config.Constants;
 import org.junit.Test;
 import org.osgi.service.cm.Configuration;
-import org.osgi.service.cm.ConfigurationAdmin;
 
 import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.Hashtable;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Covers what pull() acts on when the cluster map changes underneath it.
@@ -72,12 +69,37 @@ public class ConfigurationSynchronizerPullTest {
                 local.updated);
     }
 
+    /**
+     * The count is a lower bound on purpose. Two reads are the decision and the read under the monitor, and the
+     * local cleanup block reads the entry a third time when it runs, which it does not here because
+     * TestSynchronizer hands out an empty synchronizer map. Asserting the exact number would turn a later read
+     * added anywhere in pull() into a failure whose message describes the monitor rather than the change.
+     */
     @Test
     public void GIVEN_an_entry_deleted_while_pulling_WHEN_pulling_THEN_the_entry_is_read_inside_the_monitor() {
         synchronizer.pull(new Group("default"));
 
-        assertEquals("pull() read the entry once, so it acted on a value it sampled before taking the monitor",
-                2, clusterMap.reads);
+        assertTrue("pull() read the entry once, so it acted on a value it sampled before taking the monitor",
+                clusterMap.reads >= 2);
+    }
+
+    /**
+     * The local cleanup deletes the configurations the cluster no longer holds, and it reads its entry once now
+     * instead of a containsKey followed by a get. Reached by seeding the synchronizer map with the group's key,
+     * which is the condition that block is guarded by.
+     */
+    @Test
+    public void GIVEN_a_local_configuration_the_cluster_no_longer_holds_WHEN_pulling_THEN_it_is_deleted()
+            throws Exception {
+        Hashtable<String, Object> orphanProperties = new Hashtable<>();
+        orphanProperties.put("service.pid", "org.cortex.orphan");
+        RecordingConfiguration orphan = new RecordingConfiguration("org.cortex.orphan", orphanProperties);
+
+        TestSynchronizer withCleanup = new TestSynchronizer(clusterMap, orphan);
+        withCleanup.synchronizerMap.put(Constants.CONFIGURATION_MAP + Configurations.SEPARATOR + "default", true);
+        withCleanup.pull(new Group("default"));
+
+        assertTrue("the cleanup did not delete a configuration the cluster no longer holds", orphan.deleted);
     }
 
     /** Answers the live value once, then the deletion marker, and counts its reads. */
@@ -109,6 +131,7 @@ public class ConfigurationSynchronizerPullTest {
     private static class RecordingConfiguration extends StubConfiguration {
 
         private boolean updated;
+        private boolean deleted;
 
         private RecordingConfiguration(String pid, Dictionary<String, Object> properties) {
             super(pid, properties);
@@ -118,6 +141,11 @@ public class ConfigurationSynchronizerPullTest {
         public void update(Dictionary<String, ?> properties) {
             updated = true;
         }
+
+        @Override
+        public void delete() {
+            deleted = true;
+        }
     }
 
     /** Answers pull()'s collaborators without a container. */
@@ -125,6 +153,7 @@ public class ConfigurationSynchronizerPullTest {
 
         private final Map<String, Properties> map;
         private final Configuration local;
+        private final Map<String, Boolean> synchronizerMap = new HashMap<>();
 
         private TestSynchronizer(Map<String, Properties> map, Configuration local) {
             this.map = map;
@@ -141,7 +170,7 @@ public class ConfigurationSynchronizerPullTest {
 
         @Override
         protected Map<String, Boolean> getSynchronizerMap() {
-            return new HashMap<>();
+            return synchronizerMap;
         }
     }
 }

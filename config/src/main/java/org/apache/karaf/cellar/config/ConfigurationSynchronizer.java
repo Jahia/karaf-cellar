@@ -150,7 +150,16 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                                     localDictionary = new Properties();
 
                                 localDictionary = filter(localDictionary);
-                                if (!areEquals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary) && shouldReplicateConfig(clusterDictionary)) {
+                                // Read the entry from the map again rather than re-testing the reference above.
+                                // A put replaces the entry, it does not mutate the instance already held, so
+                                // testing that instance sees nothing written since it was read, and the work
+                                // between the two is a Configuration Admin lookup, a filter that reads the node
+                                // configuration per key, and a file write. What this cannot close is a marker
+                                // written on another node: the map is a Hazelcast ReplicatedMap, so that write
+                                // is not visible here until replication lands, whichever line reads it.
+                                Properties current = clusterConfigurations.get(pid);
+                                if (!areEquals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary)
+                                        && current != null && shouldReplicateConfig(current)) {
                                     LOGGER.debug("CELLAR CONFIG: updating configration {} on node", pid);
                                     Dictionary convertedDictionary = convertPropertiesFromCluster(clusterDictionary);
                                     persistConfiguration(localConfiguration.getPid(), localConfiguration.getProperties(), clusterDictionary);
