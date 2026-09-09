@@ -1,7 +1,9 @@
 package org.apache.karaf.cellar.config;
 
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.osgi.service.cm.Configuration;
 import org.osgi.service.cm.ConfigurationAdmin;
 
@@ -27,6 +29,14 @@ public class ConfigurationSupportCreateTest {
     private static final String FACTORY_PID = "org.jahia.bundles.api.authorization";
     private static final String FILENAME = FACTORY_PID + "-sam.yml";
 
+    /**
+     * filter() reads new File(storage, <the file name>) for the felix.fileinstall.filename key, and adds
+     * karaf.cellar.content when that file is readable, so a stray file of that name would change what the
+     * filtered dictionary holds. The fourth test asserts only the file name and would pass anyway.
+     */
+    @Rule
+    public TemporaryFolder storage = new TemporaryFolder();
+
     private RecordingConfigurationAdmin configurationAdmin;
     private ConfigurationSupport support;
 
@@ -35,7 +45,7 @@ public class ConfigurationSupportCreateTest {
         configurationAdmin = new RecordingConfigurationAdmin();
         support = new ConfigurationSupport();
         support.setConfigurationAdmin(configurationAdmin);
-        support.setStorage(new File(System.getProperty("java.io.tmpdir")));
+        support.setStorage(storage.getRoot());
     }
 
     private static Dictionary<String, Object> clusterEntry(String filename) {
