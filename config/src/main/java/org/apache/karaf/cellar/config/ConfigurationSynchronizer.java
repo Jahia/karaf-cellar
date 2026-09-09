@@ -163,11 +163,15 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                                 // fires a CM_UPDATED, and LocalConfigurationListener publishes the local value
                                 // back over the newer entry. When it has changed this pull defers the pid, and
                                 // the push that changed it produced a cluster event that brings it here anyway.
-                                // areEquals is null-safe and clusterDictionary is never a marker, so this covers
-                                // an entry that is gone and an entry marked deleted as well.
+                                // areEquals is null-safe, and clusterDictionary is never a marker because it
+                                // passed the guard above, so one term covers an entry that changed, one that is
+                                // gone and one that is now a marker.
                                 Properties current = clusterConfigurations.get(pid);
-                                if (!areEquals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary)
-                                        && areEquals(clusterDictionary, current)) {
+                                boolean unchanged = areEquals(clusterDictionary, current);
+                                if (!unchanged) {
+                                    LOGGER.debug("CELLAR CONFIG: configuration with PID {} changed in cluster group {} while pulling, deferring it to the next pull", pid, groupName);
+                                }
+                                if (!areEquals(clusterDictionary, localDictionary) && canDistributeConfig(localDictionary) && unchanged) {
                                     LOGGER.debug("CELLAR CONFIG: updating configration {} on node", pid);
                                     Dictionary convertedDictionary = convertPropertiesFromCluster(clusterDictionary);
                                     persistConfiguration(localConfiguration.getPid(), localConfiguration.getProperties(), clusterDictionary);

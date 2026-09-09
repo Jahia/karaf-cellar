@@ -79,10 +79,11 @@ public class ConfigurationSupportDeleteTest {
     }
 
     /**
-     * Answers like Felix for the three reads deleteConfiguration can make: getPid, getProperties and
-     * getFactoryPid all throw IllegalStateException once the configuration is deleted. The rest comes from
-     * StubConfiguration, so one hand-maintained implementation of Configuration in this package is enough to
-     * keep up with what the OSGi Compendium adds, and StubConfiguration's own answers are inert here.
+     * Answers like Felix: a read of a deleted configuration throws IllegalStateException. deleteConfiguration
+     * makes two of them, getPid and getProperties, and getFactoryPid is guarded against a third that does not
+     * exist yet, because a read added on the wrong side of the delete is the defect this file catches. The rest
+     * comes from StubConfiguration, so one hand-maintained implementation of Configuration in this package is
+     * enough to keep up with what the OSGi Compendium adds, and its own answers are inert here.
      */
     private static class DeletableConfiguration extends StubConfiguration {
 
@@ -112,7 +113,8 @@ public class ConfigurationSupportDeleteTest {
 
         @Override
         public String getFactoryPid() {
-            // the defect this file exists to catch is a read after the delete, and this is one of the reads
+            // deleteConfiguration does not read this today; the check is here so that adding such a read on the
+            // wrong side of the delete fails here rather than in a cluster
             checkDeleted();
             return super.getFactoryPid();
         }

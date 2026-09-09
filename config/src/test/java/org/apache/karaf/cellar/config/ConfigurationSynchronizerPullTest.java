@@ -110,6 +110,37 @@ public class ConfigurationSynchronizerPullTest {
     }
 
     /**
+     * The gate at the update site is one term covering three states, and the two tests above pin the entry that
+     * changed. These two pin the others: an entry gone by the time the gate reads it, and an entry that has
+     * become a marker by then. Both flip after the read under the monitor, so the guard above them passes and
+     * the gate is what has to refuse.
+     */
+    @Test
+    public void GIVEN_an_entry_gone_by_the_time_the_gate_reads_it_WHEN_pulling_THEN_the_local_configuration_is_not_updated() {
+        MutatingMap vanished = new MutatingMap(PID, clusterMap.first, null, 2);
+        RecordingConfiguration target = new RecordingConfiguration(PID, local.getProperties());
+
+        new TestSynchronizer(vanished, target, storage.getRoot()).pull(new Group("default"));
+
+        assertFalse("pull() applied a value the cluster no longer held", target.updated);
+    }
+
+    @Test
+    public void GIVEN_an_entry_marked_deleted_by_the_time_the_gate_reads_it_WHEN_pulling_THEN_the_local_configuration_is_not_updated() {
+        Properties marker = new Properties();
+        marker.put("service.pid", PID);
+        marker.put("karaf.cellar.filename", FILENAME);
+        marker.put("karaf.cellar.removed", true);
+
+        MutatingMap deleted = new MutatingMap(PID, clusterMap.first, marker, 2);
+        RecordingConfiguration target = new RecordingConfiguration(PID, local.getProperties());
+
+        new TestSynchronizer(deleted, target, storage.getRoot()).pull(new Group("default"));
+
+        assertFalse("pull() applied a value the cluster had marked deleted", target.updated);
+    }
+
+    /**
      * The local cleanup deletes the configurations the cluster no longer holds, and it reads its entry once now
      * instead of a containsKey followed by a get. Reached by seeding the synchronizer map with the group's key,
      * which is the condition that block is guarded by.
