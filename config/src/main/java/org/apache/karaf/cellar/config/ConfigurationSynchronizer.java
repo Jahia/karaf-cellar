@@ -149,7 +149,7 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                             // that content under the canonical pid, and the next pull has one entry to apply.
                             // The entry is skipped, never treated as absent: the cleanup below reads the map on
                             // its own and would delete the local configuration instead of leaving it alone.
-                            if (ambiguousFilenames.contains(getKarafFilename(clusterDictionary))) {
+                            if (ambiguousFilenames.contains(clusterDictionary.get(KARAF_CELLAR_FILENAME))) {
                                 LOGGER.debug("CELLAR CONFIG: configuration with PID {} names a file whose entries disagree in cluster group {}, so it is not applied", pid, groupName);
                                 continue;
                             }
@@ -266,7 +266,12 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
             if (candidate == null || !shouldReplicateConfig(candidate)) {
                 continue;
             }
-            String filename = getKarafFilename(candidate);
+            // The key is read straight off the entry. getKarafFilename would filter the dictionary first, and
+            // filter asks isExcludedProperty for every key, which reads the node configuration each time. A
+            // cluster entry cannot carry felix.fileinstall.filename, because push, LocalConfigurationListener and
+            // ConfigurationEventHandler all filter before they write, so filtering here would convert nothing.
+            // findLocalConfiguration and the clustering module's map cleaner read the key the same way.
+            String filename = (String) candidate.get(KARAF_CELLAR_FILENAME);
             if (filename == null) {
                 continue;
             }
