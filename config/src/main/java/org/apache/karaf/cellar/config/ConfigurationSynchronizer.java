@@ -151,6 +151,19 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                             // them, which is the clustering module's map cleaner.
                             // The entry is skipped, never treated as absent: the cleanup below reads the map on
                             // its own and would delete the local configuration instead of leaving it alone.
+                            // What makes not creating a local configuration safe here is outside this class, and
+                            // outside Cellar. push() runs right after for the cluster sync policy, and neither of
+                            // its two branches is guarded the way this one is: the create branch publishes the
+                            // local dictionary with no content comparison at all, and its cluster cleanup removes
+                            // any pid findLocalConfiguration cannot resolve, with no gate above it. So a node that
+                            // reaches sync holding only its module's shipped default for an ambiguous file would
+                            // publish that default and have every other node apply it, through an event handler
+                            // that has no ambiguity guard either.
+                            // The upgrade procedure is what prevents it. A node is restarted on the same data
+                            // volume, so karaf/etc survives while the OSGi configuration store is rebuilt, and the
+                            // file this node keeps is the one it already had. From here a rebuilt node and a node
+                            // with a fresh disk are indistinguishable, so the procedure is the guarantee and the
+                            // code cannot check it.
                             if (ambiguousFilenames.contains(clusterDictionary.get(KARAF_CELLAR_FILENAME))) {
                                 LOGGER.debug("CELLAR CONFIG: configuration with PID {} names a file whose entries disagree in cluster group {}, so it is not applied", pid, groupName);
                                 continue;
