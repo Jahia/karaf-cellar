@@ -121,6 +121,10 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
             try {
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
 
+                // Several entries can name one file, so the file has to be looked at before the pids that feed
+                // it. See the method for what the index does and does not promise.
+                Set<String> ambiguousFilenames = findAmbiguousFilenames(clusterConfigurations, groupName);
+
                 // get configurations on the cluster to update local configurations
                 for (String pid : clusterConfigurations.keySet()) {
                     // The key set is a snapshot and every node writes this map, so the entry can be gone by the
@@ -136,6 +140,17 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                             Dictionary clusterDictionary = clusterConfigurations.get(pid);
                             if (clusterDictionary == null || !shouldReplicateConfig(clusterDictionary)) {
                                 LOGGER.debug("CELLAR CONFIG: configuration with PID {} was removed or marked deleted in cluster group {} while pulling", pid, groupName);
+                                continue;
+                            }
+                            // Applying this entry would write one file that other entries also describe
+                            // differently, and the pid the map hands out last would decide the content. Not
+                            // applying it leaves the file as this node read it, which is the current content on a
+                            // node whose configuration store was just rebuilt. The push that follows publishes
+                            // that content under the canonical pid, and the next pull has one entry to apply.
+                            // The entry is skipped, never treated as absent: the cleanup below reads the map on
+                            // its own and would delete the local configuration instead of leaving it alone.
+                            if (ambiguousFilenames.contains(getKarafFilename(clusterDictionary))) {
+                                LOGGER.debug("CELLAR CONFIG: configuration with PID {} names a file whose entries disagree in cluster group {}, so it is not applied", pid, groupName);
                                 continue;
                             }
                             try {
@@ -211,6 +226,60 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                 Thread.currentThread().setContextClassLoader(originalClassLoader);
             }
         }
+    }
+
+    /**
+     * Answer the files that several cluster map entries describe differently.
+     * <p>
+     * An entry names the file it was read from in {@code karaf.cellar.filename}, and a node that mints a generated
+     * pid for a factory configuration publishes its own entry for a file every other node also publishes. The pull
+     * loop below iterates over pids, so it would apply each of those entries to the same local configuration in
+     * turn and the pid read last would decide the content. The map is a Hazelcast ReplicatedMap with no ordering
+     * contract on its entry set, which makes that a draw.
+     * <p>
+     * Only a disagreement is reported. Entries that carry the same content name one value, so applying them is
+     * what the pull is for, and a map written before a file-backed factory configuration was named after its file
+     * carries one entry per node for nearly every file. Refusing those as well would stop a node whose own file is
+     * behind the cluster from receiving the shared value, and its push would then write that stale content back
+     * into the map and raise a cluster event carrying it.
+     * <p>
+     * An entry that names no file is not a candidate. A singleton configuration carries no filename, and neither
+     * does a factory configuration no file feeds, so there is no file for such an entry to be ambiguous about.
+     * A deletion marker is not a candidate either, so a file with one live entry and a marker still applies.
+     * {@code areEquals} ignores {@code service.pid}, which is what makes the comparison possible at all: two
+     * entries of one file differ on that key by construction, since it is their key in the map.
+     * <p>
+     * The index is a snapshot, so an entry can appear or disappear before the loop reads it. A file counted with
+     * one entry can have two by then, which is the behaviour this method exists to change and no worse than
+     * today. A file counted with two can have one, and a pull that could have applied it skips it until the next
+     * one. Reading the entry set once keeps that window as small as this method can make it.
+     *
+     * @param clusterConfigurations the cluster group's configuration map.
+     * @param groupName the cluster group name, for the log.
+     * @return the filenames whose entries disagree, empty when none do.
+     */
+    private Set<String> findAmbiguousFilenames(Map<String, Properties> clusterConfigurations, String groupName) {
+        Map<String, Properties> candidateByFilename = new HashMap<String, Properties>();
+        Set<String> ambiguousFilenames = new HashSet<String>();
+        for (Map.Entry<String, Properties> entry : clusterConfigurations.entrySet()) {
+            Properties candidate = entry.getValue();
+            if (candidate == null || !shouldReplicateConfig(candidate)) {
+                continue;
+            }
+            String filename = getKarafFilename(candidate);
+            if (filename == null) {
+                continue;
+            }
+            // areEquals skips service.pid, and the whole rule rests on that: two entries of one file differ on
+            // that key by construction, since it is their key in this map.
+            Properties known = candidateByFilename.get(filename);
+            if (known == null) {
+                candidateByFilename.put(filename, candidate);
+            } else if (!areEquals(known, candidate) && ambiguousFilenames.add(filename)) {
+                LOGGER.warn("CELLAR CONFIG: the entries of {} in cluster group {} do not agree on its content, so none of them is applied. A node that holds the current file republishes it, and the next pull applies it once the entries agree.", filename, groupName);
+            }
+        }
+        return ambiguousFilenames;
     }
 
     /**
