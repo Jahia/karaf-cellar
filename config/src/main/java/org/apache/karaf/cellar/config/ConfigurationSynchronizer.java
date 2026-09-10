@@ -146,7 +146,9 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                             // differently, and the pid the map hands out last would decide the content. Not
                             // applying it leaves the file as this node read it, which is the current content on a
                             // node whose configuration store was just rebuilt. The push that follows publishes
-                            // that content under the canonical pid, and the next pull has one entry to apply.
+                            // that content under the canonical pid. It does not remove the entries that disagree,
+                            // so the refusal holds on every node and at every pull until something else removes
+                            // them, which is the clustering module's map cleaner.
                             // The entry is skipped, never treated as absent: the cleanup below reads the map on
                             // its own and would delete the local configuration instead of leaving it alone.
                             if (ambiguousFilenames.contains(clusterDictionary.get(KARAF_CELLAR_FILENAME))) {
