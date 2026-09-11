@@ -123,7 +123,7 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
 
                 // Several entries can name one file, so the file has to be looked at before the pids that feed
                 // it. See the method for what the index does and does not promise.
-                Set<String> ambiguousFilenames = findAmbiguousFilenames(clusterConfigurations, groupName);
+                Set<String> ambiguousFilenames = findAmbiguousFilenames(clusterConfigurations, group);
 
                 // get configurations on the cluster to update local configurations
                 for (String pid : clusterConfigurations.keySet()) {
@@ -270,15 +270,23 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
      * one. Reading the entry set once keeps that window as small as this method can make it.
      *
      * @param clusterConfigurations the cluster group's configuration map.
-     * @param groupName the cluster group name, for the log.
+     * @param group the cluster group, for the inbound gate and for the log.
      * @return the filenames whose entries disagree, empty when none do.
      */
-    private Set<String> findAmbiguousFilenames(Map<String, Properties> clusterConfigurations, String groupName) {
+    private Set<String> findAmbiguousFilenames(Map<String, Properties> clusterConfigurations, Group group) {
+        String groupName = group.getName();
         Map<String, Properties> candidateByFilename = new HashMap<String, Properties>();
         Set<String> ambiguousFilenames = new HashSet<String>();
         for (Map.Entry<String, Properties> entry : clusterConfigurations.entrySet()) {
             Properties candidate = entry.getValue();
             if (candidate == null || !shouldReplicateConfig(candidate)) {
+                continue;
+            }
+            // The same gate the loop below applies to the same entry. An entry this node blocks
+            // inbound is never applied, so it cannot take part in a draw, and counting it here
+            // would make its file ambiguous and refuse the entry that is allowed. The node would
+            // then never receive the value it is entitled to, at this pull or at any later one.
+            if (!isAllowed(group, Constants.CATEGORY, entry.getKey(), EventType.INBOUND)) {
                 continue;
             }
             // The key is read straight off the entry. getKarafFilename would filter the dictionary first, and

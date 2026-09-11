@@ -132,6 +132,28 @@ public class ConfigurationSynchronizerAmbiguousFileTest {
                 local.updates > 0);
     }
 
+    /**
+     * Two entries naming one file with content that disagrees, where this node blocks one of them
+     * inbound. The blocked entry is never applied by the pull, so it cannot take part in a draw,
+     * and the file has one candidate left.
+     * <p>
+     * Counting a blocked entry would refuse the entry that is allowed, and refuse it at every pull
+     * rather than once, because nothing makes a blocked entry go away.
+     */
+    @Test
+    public void GIVEN_one_of_two_entries_blocked_inbound_WHEN_pulling_THEN_the_allowed_one_is_applied() {
+        Map<String, Properties> clusterMap = new LinkedHashMap<String, Properties>();
+        clusterMap.put(CANONICAL_PID, entry(CANONICAL_PID, 7));
+        clusterMap.put(GENERATED_PID, entry(GENERATED_PID, 6));
+
+        RecordingConfiguration local = localReading(FILENAME, 6);
+        TestSynchronizer synchronizer = new TestSynchronizer(clusterMap, local, storage.getRoot());
+        synchronizer.blocked = GENERATED_PID;
+        synchronizer.pull(new Group("default"));
+
+        assertEquals("pull() let an entry it blocks inbound make its file ambiguous", 1, local.updates);
+    }
+
     /** An entry read from FILENAME, shipping the grants a module version ships. */
     private static Properties entry(String pid, int grants) {
         Properties properties = new Properties();
@@ -199,9 +221,11 @@ public class ConfigurationSynchronizerAmbiguousFileTest {
             setStorage(storageRoot);
         }
 
+        private String blocked;
+
         @Override
         public Boolean isAllowed(Group group, String category, String event, EventType type) {
-            return Boolean.TRUE;
+            return Boolean.valueOf(!event.equals(blocked));
         }
 
         @Override
