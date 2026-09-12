@@ -159,11 +159,18 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                             // reaches sync holding only its module's shipped default for an ambiguous file would
                             // publish that default and have every other node apply it, through an event handler
                             // that has no ambiguity guard either.
-                            // The upgrade procedure is what prevents it. A node is restarted on the same data
-                            // volume, so karaf/etc survives while the OSGi configuration store is rebuilt, and the
-                            // file this node keeps is the one it already had. From here a rebuilt node and a node
-                            // with a fresh disk are indistinguishable, so the procedure is the guarantee and the
-                            // code cannot check it.
+                            // The upgrade procedure bounds that, and does not close it. A node is restarted on
+                            // the same data volume, so karaf/etc survives while the OSGi configuration store is
+                            // rebuilt, and the file this node keeps is the one it already had. That file is
+                            // current only if this node received every configuration change while it was up.
+                            // A node that was down when one landed keeps the older file, and this refusal is what
+                            // stops it learning the newer value, so the first node of a rolling upgrade can
+                            // publish its own stale file as the cluster's canonical entry through push's create
+                            // branch, and the event handler then applies it everywhere.
+                            // That trade is deliberate. The refusal removes a draw measured on one upgrade in
+                            // three, and in exchange it makes one pre-existing bad state certain where it was a
+                            // one-in-three chance before. Both need several entries for one file, and a cluster
+                            // whose every node names a configuration after its file has one.
                             if (ambiguousFilenames.contains(clusterDictionary.get(KARAF_CELLAR_FILENAME))) {
                                 LOGGER.debug("CELLAR CONFIG: configuration with PID {} names a file whose entries disagree in cluster group {}, so it is not applied", pid, groupName);
                                 continue;
