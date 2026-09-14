@@ -121,6 +121,10 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
             try {
                 Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
 
+                // Several entries can name one file, so the file has to be looked at before the pids that feed
+                // it. See the method for what the index does and does not promise.
+                Set<String> ambiguousFilenames = findAmbiguousFilenames(clusterConfigurations, group);
+
                 // get configurations on the cluster to update local configurations
                 for (String pid : clusterConfigurations.keySet()) {
                     // The key set is a snapshot and every node writes this map, so the entry can be gone by the
@@ -136,6 +140,39 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                             Dictionary clusterDictionary = clusterConfigurations.get(pid);
                             if (clusterDictionary == null || !shouldReplicateConfig(clusterDictionary)) {
                                 LOGGER.debug("CELLAR CONFIG: configuration with PID {} was removed or marked deleted in cluster group {} while pulling", pid, groupName);
+                                continue;
+                            }
+                            // Applying this entry would write one file that other entries also describe
+                            // differently, and the pid the map hands out last would decide the content. Not
+                            // applying it leaves the file as this node read it, which is the current content on a
+                            // node whose configuration store was just rebuilt. The push that follows publishes
+                            // that content under the canonical pid. It does not remove the entries that disagree,
+                            // so the refusal holds on every node and at every pull until something else removes
+                            // them, which is the clustering module's map cleaner.
+                            // The entry is skipped, never treated as absent: the cleanup below reads the map on
+                            // its own and would delete the local configuration instead of leaving it alone.
+                            // What makes not creating a local configuration safe here is outside this class, and
+                            // outside Cellar. push() runs right after for the cluster sync policy, and neither of
+                            // its two branches is guarded the way this one is: the create branch publishes the
+                            // local dictionary with no content comparison at all, and its cluster cleanup removes
+                            // any pid findLocalConfiguration cannot resolve, with no gate above it. So a node that
+                            // reaches sync holding only its module's shipped default for an ambiguous file would
+                            // publish that default and have every other node apply it, through an event handler
+                            // that has no ambiguity guard either.
+                            // The upgrade procedure bounds that, and does not close it. A node is restarted on
+                            // the same data volume, so karaf/etc survives while the OSGi configuration store is
+                            // rebuilt, and the file this node keeps is the one it already had. That file is
+                            // current only if this node received every configuration change while it was up.
+                            // A node that was down when one landed keeps the older file, and this refusal is what
+                            // stops it learning the newer value, so the first node of a rolling upgrade can
+                            // publish its own stale file as the cluster's canonical entry through push's create
+                            // branch, and the event handler then applies it everywhere.
+                            // That trade is deliberate. The refusal removes a draw measured on one upgrade in
+                            // three, and in exchange it makes one pre-existing bad state certain where it was a
+                            // one-in-three chance before. Both need several entries for one file, and a cluster
+                            // whose every node names a configuration after its file has one.
+                            if (ambiguousFilenames.contains(clusterDictionary.get(KARAF_CELLAR_FILENAME))) {
+                                LOGGER.debug("CELLAR CONFIG: configuration with PID {} names a file whose entries disagree in cluster group {}, so it is not applied", pid, groupName);
                                 continue;
                             }
                             try {
@@ -211,6 +248,73 @@ public class ConfigurationSynchronizer extends ConfigurationSupport implements S
                 Thread.currentThread().setContextClassLoader(originalClassLoader);
             }
         }
+    }
+
+    /**
+     * Answer the files that several cluster map entries describe differently.
+     * <p>
+     * An entry names the file it was read from in {@code karaf.cellar.filename}, and a node that mints a generated
+     * pid for a factory configuration publishes its own entry for a file every other node also publishes. The pull
+     * loop below iterates over pids, so it would apply each of those entries to the same local configuration in
+     * turn and the pid read last would decide the content. The map is a Hazelcast ReplicatedMap with no ordering
+     * contract on its entry set, which makes that a draw.
+     * <p>
+     * Only a disagreement is reported. Entries that carry the same content name one value, so applying them is
+     * what the pull is for, and a map written before a file-backed factory configuration was named after its file
+     * carries one entry per node for nearly every file. Refusing those as well would stop a node whose own file is
+     * behind the cluster from receiving the shared value, and its push would then write that stale content back
+     * into the map and raise a cluster event carrying it.
+     * <p>
+     * An entry that names no file is not a candidate. A singleton configuration carries no filename, and neither
+     * does a factory configuration no file feeds, so there is no file for such an entry to be ambiguous about.
+     * A deletion marker is not a candidate either, so a file with one live entry and a marker still applies.
+     * {@code areEquals} ignores {@code service.pid}, which is what makes the comparison possible at all: two
+     * entries of one file differ on that key by construction, since it is their key in the map.
+     * <p>
+     * The index is a snapshot, so an entry can appear or disappear before the loop reads it. A file counted with
+     * one entry can have two by then, which is the behaviour this method exists to change and no worse than
+     * today. A file counted with two can have one, and a pull that could have applied it skips it until the next
+     * one. Reading the entry set once keeps that window as small as this method can make it.
+     *
+     * @param clusterConfigurations the cluster group's configuration map.
+     * @param group the cluster group, for the inbound gate and for the log.
+     * @return the filenames whose entries disagree, empty when none do.
+     */
+    private Set<String> findAmbiguousFilenames(Map<String, Properties> clusterConfigurations, Group group) {
+        String groupName = group.getName();
+        Map<String, Properties> candidateByFilename = new HashMap<String, Properties>();
+        Set<String> ambiguousFilenames = new HashSet<String>();
+        for (Map.Entry<String, Properties> entry : clusterConfigurations.entrySet()) {
+            Properties candidate = entry.getValue();
+            if (candidate == null || !shouldReplicateConfig(candidate)) {
+                continue;
+            }
+            // The same gate the loop below applies to the same entry. An entry this node blocks
+            // inbound is never applied, so it cannot take part in a draw, and counting it here
+            // would make its file ambiguous and refuse the entry that is allowed. The node would
+            // then never receive the value it is entitled to, at this pull or at any later one.
+            if (!isAllowed(group, Constants.CATEGORY, entry.getKey(), EventType.INBOUND)) {
+                continue;
+            }
+            // The key is read straight off the entry. getKarafFilename would filter the dictionary first, and
+            // filter asks isExcludedProperty for every key, which reads the node configuration each time. A
+            // cluster entry cannot carry felix.fileinstall.filename, because push, LocalConfigurationListener and
+            // ConfigurationEventHandler all filter before they write, so filtering here would convert nothing.
+            // findLocalConfiguration and the clustering module's map cleaner read the key the same way.
+            String filename = (String) candidate.get(KARAF_CELLAR_FILENAME);
+            if (filename == null) {
+                continue;
+            }
+            // areEquals skips service.pid, and the whole rule rests on that: two entries of one file differ on
+            // that key by construction, since it is their key in this map.
+            Properties known = candidateByFilename.get(filename);
+            if (known == null) {
+                candidateByFilename.put(filename, candidate);
+            } else if (!areEquals(known, candidate) && ambiguousFilenames.add(filename)) {
+                LOGGER.warn("CELLAR CONFIG: the entries of {} in cluster group {} do not agree on its content, so none of them is applied. A node that holds the current file republishes it, and the next pull applies it once the entries agree.", filename, groupName);
+            }
+        }
+        return ambiguousFilenames;
     }
 
     /**
