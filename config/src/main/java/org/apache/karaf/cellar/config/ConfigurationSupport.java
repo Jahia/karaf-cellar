@@ -192,14 +192,39 @@ public class ConfigurationSupport extends CellarSupport {
     }
 
     public Configuration createLocalConfiguration(String pid, Dictionary clusterDictionary) throws IOException {
-        Configuration localConfiguration;
         Object factoryPid = clusterDictionary.get(ConfigurationAdmin.SERVICE_FACTORYPID);
-        if (factoryPid != null) {
-            localConfiguration = configurationAdmin.createFactoryConfiguration(factoryPid.toString(), "?");
-        } else {
-            localConfiguration = configurationAdmin.getConfiguration(pid, "?");
+        if (factoryPid == null) {
+            return configurationAdmin.getConfiguration(pid, "?");
         }
-        return localConfiguration;
+        // A factory configuration that a file feeds is named after that file, so every node names it the same way
+        // and names it the same way again after its configuration store is rebuilt. createFactoryConfiguration
+        // would mint a generated pid instead, which makes the same file a different resource on this node and
+        // leaves an entry behind in the cluster map for as long as the cluster lives.
+        String alias = aliasFromFilename(factoryPid.toString(),
+                Objects.toString(clusterDictionary.get(KARAF_CELLAR_FILENAME), null));
+        if (alias == null) {
+            return configurationAdmin.createFactoryConfiguration(factoryPid.toString(), "?");
+        }
+        return configurationAdmin.getFactoryConfiguration(factoryPid.toString(), alias, "?");
+    }
+
+    /**
+     * Read, from the name of the file a configuration is written to, the alias that names it inside its factory.
+     *
+     * @param factoryPid the factory pid the configuration belongs to.
+     * @param filename the karaf.cellar.filename of the configuration, {@code <factoryPid>-<alias>.<extension>}.
+     * @return the alias, or null when there is no file name or it does not carry the factory pid.
+     */
+    static String aliasFromFilename(String factoryPid, String filename) {
+        if (factoryPid == null || filename == null) {
+            return null;
+        }
+        int extension = filename.lastIndexOf('.');
+        String stem = extension > 0 ? filename.substring(0, extension) : filename;
+        String prefix = factoryPid + "-";
+        // An empty alias is an alias: Jahia core's parsePid and Felix's ConfigInstaller both read one out of
+        // <factoryPid>-.yml, so rejecting it here would name that file's configuration differently from them.
+        return stem.startsWith(prefix) ? stem.substring(prefix.length()) : null;
     }
 
     public Dictionary convertPropertiesFromCluster(Dictionary dictionary) {
